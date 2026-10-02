@@ -1,0 +1,11 @@
+# This file is at the repo root.
+# Railway requires each service to set its Root Directory:
+#   Backend  → /backend
+#   Frontend → /frontend
+#   Worker   → /backend  (different start command)
+#
+# Set Root Directory in Railway UI:
+# Service Settings → Build & Deploy → Root Directory
+
+[build]
+builder = "nixpacks"
