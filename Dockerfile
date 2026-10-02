@@ -2,20 +2,27 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system deps
-RUN apt-get update && apt-get install -y --no-install-recommends gcc g++ && rm -rf /var/lib/apt/lists/*
+# System deps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ libffi-dev && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install Python deps
-COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies (standard pip, not Nix)
+COPY backend/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Copy backend source
+# Copy backend source code
 COPY backend/ ./backend/
 
-# Create tables on startup
+# Set working directory to backend
 WORKDIR /app/backend
-RUN python create_tables.py || true
 
+# Create SQLite tables
+RUN python create_tables.py || echo "Tables already exist"
+
+# Expose port
 EXPOSE 8000
 
+# Start server
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
