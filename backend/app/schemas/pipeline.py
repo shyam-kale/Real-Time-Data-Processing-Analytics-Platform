@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from app.models.pipeline import PipelineStatus, RunStatus, NodeType
+
+_CFG = ConfigDict(from_attributes=True, use_enum_values=True)
 
 
 class NodePosition(BaseModel):
@@ -41,6 +43,7 @@ class PipelineUpdate(BaseModel):
 
 
 class PipelineNodeOut(BaseModel):
+    model_config = _CFG
     id: str
     node_type: NodeType
     label: str
@@ -48,29 +51,25 @@ class PipelineNodeOut(BaseModel):
     position_x: float
     position_y: float
 
-    model_config = {"from_attributes": True}
-
 
 class PipelineEdgeOut(BaseModel):
+    model_config = _CFG
     id: str
     source_node_id: str
     target_node_id: str
 
-    model_config = {"from_attributes": True}
-
 
 class PipelineOut(BaseModel):
+    model_config = _CFG
     id: str
     name: str
-    description: Optional[str]
+    description: Optional[str] = None
     status: PipelineStatus
-    tags: Optional[str]
+    tags: Optional[str] = None
     created_at: datetime
     updated_at: datetime
-    last_run_at: Optional[datetime]
-    last_run_status: Optional[RunStatus]
-
-    model_config = {"from_attributes": True}
+    last_run_at: Optional[datetime] = None
+    last_run_status: Optional[RunStatus] = None
 
 
 class PipelineDetailOut(PipelineOut):
@@ -79,18 +78,17 @@ class PipelineDetailOut(PipelineOut):
 
 
 class PipelineRunOut(BaseModel):
+    model_config = _CFG
     id: str
     pipeline_id: str
     status: RunStatus
-    current_stage: Optional[str]
-    input_records: Optional[int]
-    output_records: Optional[int]
-    failed_records: Optional[int]
-    duration_seconds: Optional[float]
-    error_message: Optional[str]
-    logs: Optional[List]
-    started_at: Optional[datetime]
-    completed_at: Optional[datetime]
+    current_stage: Optional[str] = None
+    input_records: Optional[int] = None
+    output_records: Optional[int] = None
+    failed_records: Optional[int] = None
+    duration_seconds: Optional[float] = None
+    error_message: Optional[str] = None
+    logs: Optional[List] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
     created_at: datetime
-
-    model_config = {"from_attributes": True}

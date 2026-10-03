@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from datetime import datetime
 from app.models.alert import AlertConditionType, AlertSeverity, AlertStatus
+
+_CFG = ConfigDict(from_attributes=True, use_enum_values=True)
 
 
 class AlertCreate(BaseModel):
@@ -24,16 +26,15 @@ class AlertUpdate(BaseModel):
 
 
 class AlertOut(BaseModel):
+    model_config = _CFG
     id: str
     name: str
-    description: Optional[str]
+    description: Optional[str] = None
     condition_type: AlertConditionType
-    threshold: Optional[float]
-    dataset_id: Optional[str]
-    pipeline_id: Optional[str]
+    threshold: Optional[float] = None
+    dataset_id: Optional[str] = None
+    pipeline_id: Optional[str] = None
     severity: AlertSeverity
     status: AlertStatus
-    last_triggered_at: Optional[datetime]
+    last_triggered_at: Optional[datetime] = None
     created_at: datetime
-
-    model_config = {"from_attributes": True}

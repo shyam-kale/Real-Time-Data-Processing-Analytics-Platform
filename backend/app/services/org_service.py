@@ -21,11 +21,11 @@ async def get_org_members(db: AsyncSession, org_id: str) -> List[dict]:
             "id": m.id,
             "user_id": m.user_id,
             "organization_id": m.organization_id,
-            "role": m.role,
+            "role": m.role.value if hasattr(m.role, 'value') else m.role,
             "user_email": u.email,
             "user_full_name": u.full_name,
             "user_avatar_url": u.avatar_url,
-            "joined_at": m.joined_at,
+            "joined_at": m.joined_at.isoformat() if m.joined_at else None,
         }
         for m, u in rows
     ]
@@ -65,11 +65,11 @@ async def invite_member(
         "id": member.id,
         "user_id": user.id,
         "organization_id": org_id,
-        "role": member.role,
+        "role": member.role.value if hasattr(member.role, 'value') else member.role,
         "user_email": user.email,
         "user_full_name": user.full_name,
         "user_avatar_url": user.avatar_url,
-        "joined_at": member.joined_at,
+        "joined_at": member.joined_at.isoformat() if member.joined_at else None,
     }
 
 

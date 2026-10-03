@@ -1,48 +1,49 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Any, Dict
 from datetime import datetime
 from app.models.dataset import DatasetStatus, FileFormat, ColumnDataType
 
+_CFG = ConfigDict(from_attributes=True, use_enum_values=True)
+
 
 class DatasetOut(BaseModel):
+    model_config = _CFG
     id: str
     name: str
-    description: Optional[str]
+    description: Optional[str] = None
     file_format: FileFormat
     file_size_bytes: int
     status: DatasetStatus
-    row_count: Optional[int]
-    column_count: Optional[int]
-    null_count: Optional[int]
-    duplicate_count: Optional[int]
-    tags: Optional[str]
+    row_count: Optional[int] = None
+    column_count: Optional[int] = None
+    null_count: Optional[int] = None
+    duplicate_count: Optional[int] = None
+    tags: Optional[str] = None
     created_at: datetime
     updated_at: datetime
-    last_profiled_at: Optional[datetime]
-
-    model_config = {"from_attributes": True}
+    last_profiled_at: Optional[datetime] = None
 
 
 class DatasetColumnOut(BaseModel):
+    model_config = _CFG
     id: str
     name: str
     position: int
     data_type: ColumnDataType
     nullable: bool
-    null_count: Optional[int]
-    unique_count: Optional[int]
-    min_value: Optional[str]
-    max_value: Optional[str]
-    mean_value: Optional[float]
-    std_value: Optional[float]
-    sample_values: Optional[List[Any]]
-
-    model_config = {"from_attributes": True}
+    null_count: Optional[int] = None
+    unique_count: Optional[int] = None
+    min_value: Optional[str] = None
+    max_value: Optional[str] = None
+    mean_value: Optional[float] = None
+    std_value: Optional[float] = None
+    sample_values: Optional[List[Any]] = None
 
 
 class DatasetDetailOut(DatasetOut):
     columns: List[DatasetColumnOut] = []
     profile_data: Optional[Dict] = None
+    schema_snapshot: Optional[Dict[str, str]] = None
 
 
 class DataExplorerQuery(BaseModel):

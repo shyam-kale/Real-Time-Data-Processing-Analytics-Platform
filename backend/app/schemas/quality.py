@@ -1,24 +1,26 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional, List, Any
 from datetime import datetime
 from app.models.quality import QualitySeverity, QualityIssueType
 
+_CFG = ConfigDict(from_attributes=True, use_enum_values=True)
+
 
 class QualityIssueOut(BaseModel):
+    model_config = _CFG
     id: str
     issue_type: QualityIssueType
     severity: QualitySeverity
-    column_name: Optional[str]
+    column_name: Optional[str] = None
     description: str
     affected_rows: int
     affected_percentage: float
-    sample_values: Optional[List[Any]]
-    suggestion: Optional[str]
-
-    model_config = {"from_attributes": True}
+    sample_values: Optional[List[Any]] = None
+    suggestion: Optional[str] = None
 
 
 class QualityReportOut(BaseModel):
+    model_config = _CFG
     id: str
     dataset_id: str
     overall_score: float
@@ -30,8 +32,6 @@ class QualityReportOut(BaseModel):
     passed_rows: int
     failed_rows: int
     issue_count: int
-    summary: Optional[dict]
+    summary: Optional[dict] = None
     created_at: datetime
     issues: List[QualityIssueOut] = []
-
-    model_config = {"from_attributes": True}

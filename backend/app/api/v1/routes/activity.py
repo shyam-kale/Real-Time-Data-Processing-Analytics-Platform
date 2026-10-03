@@ -10,6 +10,16 @@ from app.models.activity import ActivityLog
 router = APIRouter(prefix="/orgs/{org_id}/activity", tags=["activity"])
 
 
+def _fmt(v):
+    if v is None:
+        return None
+    if hasattr(v, 'isoformat'):
+        return v.isoformat()
+    if hasattr(v, 'value'):
+        return v.value
+    return v
+
+
 @router.get("")
 async def list_activity(
     org_id: str,
@@ -26,12 +36,23 @@ async def list_activity(
         q = q.where(ActivityLog.action.ilike(f"%{action}%"))
         cq = cq.where(ActivityLog.action.ilike(f"%{action}%"))
     q = q.order_by(ActivityLog.created_at.desc())
-    items = (await db.execute(q.offset((page-1)*page_size).limit(page_size))).scalars().all()
+    items = (await db.execute(q.offset((page - 1) * page_size).limit(page_size))).scalars().all()
     total = (await db.execute(cq)).scalar()
     return {
-        "items": [{"id": l.id, "action": l.action, "resource_type": l.resource_type,
-                   "resource_id": l.resource_id, "resource_name": l.resource_name,
-                   "user_id": l.user_id, "details": l.details,
-                   "ip_address": l.ip_address, "created_at": l.created_at} for l in items],
-        "total": total, "page": page,
+        "items": [
+            {
+                "id": l.id,
+                "action": l.action,
+                "resource_type": l.resource_type,
+                "resource_id": l.resource_id,
+                "resource_name": l.resource_name,
+                "user_id": l.user_id,
+                "details": l.details,
+                "ip_address": l.ip_address,
+                "created_at": _fmt(l.created_at),
+            }
+            for l in items
+        ],
+        "total": total,
+        "page": page,
     }
