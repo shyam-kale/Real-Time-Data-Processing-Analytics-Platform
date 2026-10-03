@@ -185,7 +185,8 @@ async def init_endpoint(db: AsyncSession = Depends(get_db)):
 
 
 # ── Serve React frontend static files ─────────────────────────────────────────
-STATIC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "static"))
+STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "static")
+STATIC_DIR = os.path.normpath(STATIC_DIR)
 
 if os.path.isdir(STATIC_DIR):
     assets_dir = os.path.join(STATIC_DIR, "assets")
@@ -194,7 +195,14 @@ if os.path.isdir(STATIC_DIR):
 
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
+        # Never intercept API or WebSocket routes
+        if full_path.startswith("api/") or full_path.startswith("ws/"):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail="Not found")
         index = os.path.join(STATIC_DIR, "index.html")
+        if not os.path.isfile(index):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=503, detail="Frontend not built")
         return FileResponse(index)
 else:
     @app.get("/")

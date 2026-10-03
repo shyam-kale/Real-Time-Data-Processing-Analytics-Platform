@@ -3,19 +3,17 @@ import asyncio
 import os
 import sys
 
-# Force SQLite before any imports
-os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./dataflow.db"
-os.environ["DATABASE_URL_SYNC"] = "sqlite:///./dataflow.db"
-
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
 async def main():
     from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
     from sqlalchemy import text
+    import pathlib as _pl
 
+    _startup_db = _pl.Path(__file__).resolve().parent / "dataflow.db"
     engine = create_async_engine(
-        "sqlite+aiosqlite:///./dataflow.db",
+        f"sqlite+aiosqlite:///{_startup_db}",
         connect_args={"check_same_thread": False}
     )
 

@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     VERSION: str = "1.0.0"
 
-    SECRET_KEY: str = "dev-secret-key-change-in-production-aabbcc"
+    SECRET_KEY: str = "dataflow-production-secret-key-2024-xK9mN3pQ7rS1vW5yA8bE2hJ6nU0tY4cL"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7   # 7 days for demo
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     DATABASE_URL_SYNC: str = "sqlite:///./dataflow.db"
 
     REDIS_URL: str = "redis://localhost:6379/0"
-    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000,https://real-time-data-processing-analytics-platform-production-8c61.up.railway.app"
+    ALLOWED_ORIGINS: str = "*"
     UPLOAD_DIR: str = "./uploads"
     MAX_UPLOAD_SIZE_MB: int = 500
 
