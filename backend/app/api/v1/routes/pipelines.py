@@ -1,6 +1,7 @@
 ﻿from fastapi import APIRouter, Depends, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.db.base import get_db
 from app.api.deps import get_current_user, get_org_member
@@ -10,6 +11,15 @@ from app.services.pipeline_service import create_pipeline, update_pipeline, get_
 from app.models.pipeline import Pipeline, PipelineNode, PipelineEdge, PipelineRun, RunStatus
 
 router = APIRouter(prefix="/orgs/{org_id}/pipelines", tags=["pipelines"])
+
+
+async def _load_pipeline_detail(db: AsyncSession, pipeline_id: str) -> Pipeline:
+    result = await db.execute(
+        select(Pipeline)
+        .options(selectinload(Pipeline.nodes), selectinload(Pipeline.edges))
+        .where(Pipeline.id == pipeline_id)
+    )
+    return result.scalar_one_or_none()
 
 
 @router.post("", response_model=PipelineDetailOut, status_code=201)
@@ -22,10 +32,7 @@ async def create(
 ):
     pipeline = await create_pipeline(db, org_id, current_user.id, data)
     await db.commit()
-    await db.refresh(pipeline)
-    pipeline.nodes = (await db.execute(select(PipelineNode).where(PipelineNode.pipeline_id == pipeline.id))).scalars().all()
-    pipeline.edges = (await db.execute(select(PipelineEdge).where(PipelineEdge.pipeline_id == pipeline.id))).scalars().all()
-    return pipeline
+    return await _load_pipeline_detail(db, pipeline.id)
 
 
 @router.get("", response_model=dict)
@@ -49,10 +56,8 @@ async def get_one(
     current_user: User = Depends(get_current_user),
     _member=Depends(get_org_member),
 ):
-    pipeline = await get_pipeline(db, pipeline_id, org_id)
-    pipeline.nodes = (await db.execute(select(PipelineNode).where(PipelineNode.pipeline_id == pipeline_id))).scalars().all()
-    pipeline.edges = (await db.execute(select(PipelineEdge).where(PipelineEdge.pipeline_id == pipeline_id))).scalars().all()
-    return pipeline
+    await get_pipeline(db, pipeline_id, org_id)
+    return await _load_pipeline_detail(db, pipeline_id)
 
 
 @router.put("/{pipeline_id}", response_model=PipelineDetailOut)
@@ -66,10 +71,7 @@ async def update(
 ):
     pipeline = await update_pipeline(db, pipeline_id, org_id, current_user.id, data)
     await db.commit()
-    await db.refresh(pipeline)
-    pipeline.nodes = (await db.execute(select(PipelineNode).where(PipelineNode.pipeline_id == pipeline_id))).scalars().all()
-    pipeline.edges = (await db.execute(select(PipelineEdge).where(PipelineEdge.pipeline_id == pipeline_id))).scalars().all()
-    return pipeline
+    return await _load_pipeline_detail(db, pipeline.id)
 
 
 @router.delete("/{pipeline_id}", status_code=204)
@@ -99,15 +101,8 @@ async def run_pipeline(
     await db.flush()
     run_id = run.id
     await db.commit()
-
-    def _dispatch_pipeline(rid: str):
-        try:
-            from app.workers.tasks import task_execute_pipeline
-            task_execute_pipeline.delay(rid)
-        except Exception:
-            pass
-
-    background_tasks.add_task(_dispatch_pipeline, run_id)
+    from app.workers.tasks import task_execute_pipeline
+    background_tasks.add_task(lambda: task_execute_pipeline.delay(run_id))
     return run
 
 

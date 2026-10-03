@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, UploadFile, File, Form, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from app.db.base import get_db
 from app.api.deps import get_current_user, get_org_member
@@ -29,15 +30,8 @@ async def upload(
 ):
     dataset = await upload_dataset(db, org_id, current_user.id, file, name, description, tags)
     await db.commit()
-
-    def _dispatch_profile(dataset_id: str):
-        try:
-            from app.workers.tasks import task_profile_dataset
-            task_profile_dataset.delay(dataset_id)
-        except Exception:
-            pass  # Celery/Redis unavailable — profiling will be skipped
-
-    background_tasks.add_task(_dispatch_profile, dataset.id)
+    from app.workers.tasks import task_profile_dataset
+    background_tasks.add_task(lambda: task_profile_dataset.delay(dataset.id))
     return dataset
 
 
@@ -68,19 +62,13 @@ async def get_one(
     current_user: User = Depends(get_current_user),
     _member=Depends(get_org_member),
 ):
-    dataset = await get_dataset(db, dataset_id, org_id)
     result = await db.execute(
-        select(DatasetColumn)
-        .where(DatasetColumn.dataset_id == dataset_id)
-        .order_by(DatasetColumn.position)
+        select(DatasetColumn).where(DatasetColumn.dataset_id == dataset_id).order_by(DatasetColumn.position)
     )
     columns = result.scalars().all()
-    # Build the response dict manually to avoid triggering SQLAlchemy's
-    # lazy-load on the relationship attribute (which fails in async context).
-    return DatasetDetailOut.model_validate({
-        **dataset.__dict__,
-        "columns": columns,
-    })
+    dataset = await get_dataset(db, dataset_id, org_id)
+    dataset.columns = columns
+    return dataset
 
 
 @router.delete("/{dataset_id}", status_code=204)
@@ -105,15 +93,8 @@ async def trigger_profile(
     _member=Depends(get_org_member),
 ):
     await get_dataset(db, dataset_id, org_id)
-
-    def _dispatch_profile(did: str):
-        try:
-            from app.workers.tasks import task_profile_dataset
-            task_profile_dataset.delay(did)
-        except Exception:
-            pass
-
-    background_tasks.add_task(_dispatch_profile, dataset_id)
+    from app.workers.tasks import task_profile_dataset
+    background_tasks.add_task(lambda: task_profile_dataset.delay(dataset_id))
     return {"message": "Profiling started", "dataset_id": dataset_id}
 
 
@@ -138,15 +119,8 @@ async def trigger_quality(
     await db.flush()
     report_id = report.id
     await db.commit()
-
-    def _dispatch_quality(did: str, rid: str):
-        try:
-            from app.workers.tasks import task_run_quality_analysis
-            task_run_quality_analysis.delay(did, rid)
-        except Exception:
-            pass
-
-    background_tasks.add_task(_dispatch_quality, dataset_id, report_id)
+    from app.workers.tasks import task_run_quality_analysis
+    background_tasks.add_task(lambda: task_run_quality_analysis.delay(dataset_id, report_id))
     return {"message": "Quality analysis started", "report_id": report_id}
 
 
@@ -159,14 +133,15 @@ async def get_quality_reports(
     _member=Depends(get_org_member),
 ):
     await get_dataset(db, dataset_id, org_id)
+    # Use selectinload to eagerly load issues in the same async context
     result = await db.execute(
-        select(QualityReport).where(QualityReport.dataset_id == dataset_id)
-        .order_by(QualityReport.created_at.desc()).limit(10)
+        select(QualityReport)
+        .options(selectinload(QualityReport.issues))
+        .where(QualityReport.dataset_id == dataset_id)
+        .order_by(QualityReport.created_at.desc())
+        .limit(10)
     )
     reports = result.scalars().all()
-    for r in reports:
-        issues = await db.execute(select(QualityIssue).where(QualityIssue.report_id == r.id))
-        r.issues = issues.scalars().all()
     return reports
 
 
@@ -184,28 +159,36 @@ async def explore_data(
     dataset = await get_dataset(db, dataset_id, org_id)
     df = load_dataset_to_df(dataset.file_path, dataset.file_format)
     total_rows = len(df)
+
     if query.search:
         mask = pd.Series(False, index=df.index)
         for col in df.columns:
             mask |= df[col].astype(str).str.contains(query.search, case=False, na=False)
-        df = df[mask]; total_rows = len(df)
+        df = df[mask]
+        total_rows = len(df)
+
     if query.filters:
         for f in query.filters:
             col, op, val = f.get("column"), f.get("operator", "eq"), f.get("value")
             if col and col in df.columns:
-                if op == "eq": df = df[df[col].astype(str) == str(val)]
+                if op == "eq":       df = df[df[col].astype(str) == str(val)]
                 elif op == "contains": df = df[df[col].astype(str).str.contains(str(val), case=False, na=False)]
-                elif op == "gt": df = df[pd.to_numeric(df[col], errors="coerce") > float(val)]
-                elif op == "lt": df = df[pd.to_numeric(df[col], errors="coerce") < float(val)]
+                elif op == "gt":     df = df[pd.to_numeric(df[col], errors="coerce") > float(val)]
+                elif op == "lt":     df = df[pd.to_numeric(df[col], errors="coerce") < float(val)]
                 elif op == "not_null": df = df[df[col].notna()]
         total_rows = len(df)
+
     if query.sort_column and query.sort_column in df.columns:
         df = df.sort_values(by=query.sort_column, ascending=(query.sort_direction == "asc"))
+
     start = (query.page - 1) * query.page_size
     page_df = df.iloc[start:start + query.page_size].replace({float("nan"): None})
+
     return DataExplorerResponse(
-        rows=page_df.to_dict(orient="records"), total_rows=total_rows,
-        page=query.page, page_size=query.page_size,
+        rows=page_df.to_dict(orient="records"),
+        total_rows=total_rows,
+        page=query.page,
+        page_size=query.page_size,
         total_pages=(total_rows + query.page_size - 1) // query.page_size,
         columns=list(df.columns),
     )

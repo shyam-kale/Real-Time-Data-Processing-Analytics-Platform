@@ -42,7 +42,10 @@ function PipelineNodeComponent({ data, selected }: NodeProps) {
   )
 }
 
-const NODE_COMPONENTS = { pipelineNode: PipelineNodeComponent }
+// Define OUTSIDE component to prevent ReactFlow warning #002
+const NODE_COMPONENTS: Record<string, React.ComponentType<NodeProps>> = {
+  pipelineNode: PipelineNodeComponent,
+}
 
 let nodeCount = 0
 function makeNode(type: NodeType, label: string, x: number, y: number): Node {
