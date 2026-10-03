@@ -103,7 +103,7 @@ async def init_db(db: AsyncSession = Depends(get_db)):
             """), {"pwd": hash_password("dataflow123")})
             # Create member
             await db.execute(text("""
-                INSERT OR IGNORE INTO members (id, user_id, organization_id, role, created_at)
+                INSERT OR IGNORE INTO organization_members (id, user_id, organization_id, role, created_at)
                 VALUES ('member-1', 'user-1', 'org-1', 'owner', datetime('now'))
             """))
         return {"status": "Database initialized", "email": "shyam@dataflow.io", "password": "dataflow123"}

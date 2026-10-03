@@ -5,11 +5,9 @@ FROM node:20-alpine AS frontend-builder
 
 WORKDIR /frontend
 
-# Copy package files and install deps
 COPY frontend/package.json ./
 RUN npm install
 
-# Copy source and build
 COPY frontend/ ./
 RUN npm run build
 
@@ -25,6 +23,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc g++ libffi-dev && \
     rm -rf /var/lib/apt/lists/*
 
+# Force SQLite — never connect to MySQL
+ENV DATABASE_URL=sqlite+aiosqlite:///./dataflow.db
+ENV DATABASE_URL_SYNC=sqlite:///./dataflow.db
+ENV APP_ENV=production
+ENV DEBUG=false
+
 # Install Python dependencies
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
@@ -36,13 +40,11 @@ COPY backend/ ./backend/
 # Copy built frontend into backend static folder
 COPY --from=frontend-builder /frontend/dist ./backend/static
 
-# Set working directory to backend
 WORKDIR /app/backend
 
-# Copy startup script
-COPY backend/startup.py ./
+# Initialize DB and seed demo user at build time
+RUN python startup.py
 
 EXPOSE 8000
 
-# Run startup then start FastAPI
-CMD ["sh", "-c", "python startup.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

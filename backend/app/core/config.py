@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # Database — defaults to SQLite locally, override with Railway MySQL URL
+    # Database — force SQLite if no env var set
     DATABASE_URL: str = "sqlite+aiosqlite:///./dataflow.db"
     DATABASE_URL_SYNC: str = "sqlite:///./dataflow.db"
 
