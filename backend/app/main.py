@@ -1,10 +1,13 @@
 import asyncio
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.base import get_db
 
 from app.core.config import settings
 from app.core.logging import configure_logging
@@ -79,6 +82,33 @@ app.include_router(ws.router)
 @app.get("/health")
 async def health():
     return {"status": "ok", "version": settings.VERSION}
+
+
+@app.get("/api/v1/init")
+async def init_db(db: AsyncSession = Depends(get_db)):
+    """One-time initialization — creates tables and seed user"""
+    from sqlalchemy import text
+    from app.core.security import hash_password
+    try:
+        async with db.begin():
+            # Create org
+            await db.execute(text("""
+                INSERT OR IGNORE INTO organizations (id, name, slug, description, is_active, created_at, updated_at)
+                VALUES ('org-1', 'DataFlow Demo', 'dataflow-demo', 'Demo organization', 1, datetime('now'), datetime('now'))
+            """))
+            # Create user
+            await db.execute(text("""
+                INSERT OR IGNORE INTO users (id, email, full_name, hashed_password, is_active, is_superuser, created_at, updated_at)
+                VALUES ('user-1', 'shyam@dataflow.io', 'Shyam Patil', :pwd, 1, 1, datetime('now'), datetime('now'))
+            """), {"pwd": hash_password("dataflow123")})
+            # Create member
+            await db.execute(text("""
+                INSERT OR IGNORE INTO members (id, user_id, organization_id, role, created_at)
+                VALUES ('member-1', 'user-1', 'org-1', 'owner', datetime('now'))
+            """))
+        return {"status": "Database initialized", "email": "shyam@dataflow.io", "password": "dataflow123"}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 # ── Serve React frontend static files ─────────────────────────────────────────
