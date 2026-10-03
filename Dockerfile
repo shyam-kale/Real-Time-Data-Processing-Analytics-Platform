@@ -39,11 +39,10 @@ COPY --from=frontend-builder /frontend/dist ./backend/static
 # Set working directory to backend
 WORKDIR /app/backend
 
-# Create tables and seed data on startup
-RUN python create_tables.py || echo "Tables already exist"
-RUN python seed.py || echo "Seed already exists"
+# Copy startup script
+COPY backend/startup.py ./
 
 EXPOSE 8000
 
-# Start FastAPI — serves both API and frontend static files
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run startup then start FastAPI
+CMD ["sh", "-c", "python startup.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
