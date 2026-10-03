@@ -1,38 +1,46 @@
 """
 Celery tasks for async processing: dataset profiling, quality analysis, pipeline execution.
+Guards all imports so the web server starts cleanly even without Celery/Redis.
 """
 import time
 import json
 from datetime import datetime, timezone
 from typing import Optional
 
-import redis
+# ── Lazy Celery/Redis setup — only executed when Celery worker is running ──────
+try:
+    import redis as _redis_module
+    from app.workers.celery_app import celery_app
+    from app.core.config import settings
+    from app.models.dataset import DatasetStatus, FileFormat
+    from app.models.pipeline import RunStatus
+    from sqlalchemy import create_engine, select, update
+    from sqlalchemy.orm import sessionmaker
 
-from app.workers.celery_app import celery_app
-from app.core.config import settings
-from app.processing.profiler import profile_dataset
-from app.processing.quality_engine import analyze_quality
-from app.processing.pipeline_executor import execute_pipeline_graph
-from app.models.dataset import DatasetStatus, FileFormat
-from app.models.pipeline import RunStatus
-
-# Sync DB session for Celery (can't use async inside Celery easily)
-from sqlalchemy import create_engine, select, update
-from sqlalchemy.orm import sessionmaker
-
-is_sync_sqlite = settings.DATABASE_URL_SYNC.startswith("sqlite")
-sync_engine_kwargs = {"connect_args": {"check_same_thread": False}} if is_sync_sqlite else {"pool_pre_ping": True}
-sync_engine = create_engine(settings.DATABASE_URL_SYNC, **sync_engine_kwargs)
-SyncSession = sessionmaker(sync_engine)
-
-# Redis client for WebSocket pub/sub
-redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+    is_sync_sqlite = settings.DATABASE_URL_SYNC.startswith("sqlite")
+    _engine_kwargs = {"connect_args": {"check_same_thread": False}} if is_sync_sqlite else {"pool_pre_ping": True}
+    sync_engine = create_engine(settings.DATABASE_URL_SYNC, **_engine_kwargs)
+    SyncSession = sessionmaker(sync_engine)
+    redis_client = _redis_module.from_url(settings.REDIS_URL, decode_responses=True)
+    _CELERY_AVAILABLE = True
+except Exception:
+    _CELERY_AVAILABLE = False
+    # Provide a no-op decorator so the route import doesn't crash
+    class _FakeTask:
+        def delay(self, *a, **kw): pass
+    class _FakeCelery:
+        def task(self, *a, **kw):
+            def decorator(fn): return _FakeTask()
+            return decorator
+    celery_app = _FakeCelery()
+    SyncSession = None
+    redis_client = None
 
 
 def _publish(channel: str, data: dict) -> None:
-    """Publish progress updates to Redis pub/sub for WebSocket relay."""
     try:
-        redis_client.publish(channel, json.dumps(data))
+        if redis_client:
+            redis_client.publish(channel, json.dumps(data))
     except Exception:
         pass
 

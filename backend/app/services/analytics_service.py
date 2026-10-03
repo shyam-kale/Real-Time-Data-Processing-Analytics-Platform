@@ -91,8 +91,8 @@ async def run_analytics_query(db: AsyncSession, org_id: str, query: AnalyticsQue
 
 
 def _generate_demo_df(dataset) -> "Optional[pd.DataFrame]":
-    import pandas as pd
     """Generate synthetic demo data from schema_snapshot for seeded datasets."""
+    import pandas as pd
     import random
     from datetime import datetime, timedelta
 
