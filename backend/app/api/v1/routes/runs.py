@@ -41,8 +41,13 @@ async def list_all_runs(
                     "pipeline_id": str(r.pipeline_id),
                     "triggered_by": str(r.triggered_by) if r.triggered_by else None,
                     "status": _fmt(r.status),
+                    "input_records": r.input_records,
+                    "output_records": r.output_records,
+                    "failed_records": r.failed_records,
+                    "duration_seconds": r.duration_seconds,
+                    "error_message": r.error_message,
                     "started_at": _fmt(r.started_at),
-                    "ended_at": _fmt(r.ended_at),
+                    "completed_at": _fmt(r.completed_at),
                     "created_at": _fmt(r.created_at),
                 }
                 for r in runs
@@ -78,8 +83,13 @@ async def get_run(
             "pipeline_id": str(run.pipeline_id),
             "triggered_by": str(run.triggered_by) if run.triggered_by else None,
             "status": _fmt(run.status),
+            "input_records": run.input_records,
+            "output_records": run.output_records,
+            "failed_records": run.failed_records,
+            "duration_seconds": run.duration_seconds,
+            "error_message": run.error_message,
             "started_at": _fmt(run.started_at),
-            "ended_at": _fmt(run.ended_at),
+            "completed_at": _fmt(run.completed_at),
             "created_at": _fmt(run.created_at),
         }
     except Exception as e:

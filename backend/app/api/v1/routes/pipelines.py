@@ -41,11 +41,14 @@ def _serialize_pipeline(p):
         "organization_id": str(p.organization_id),
         "name": p.name,
         "description": p.description,
-        "config": p.config,
-        "is_enabled": p.is_enabled,
+        "status": _fmt(p.status),
+        "schedule": p.schedule,
+        "tags": p.tags,
         "created_by": str(p.created_by) if p.created_by else None,
         "created_at": _fmt(p.created_at),
         "updated_at": _fmt(p.updated_at),
+        "last_run_at": _fmt(p.last_run_at),
+        "last_run_status": _fmt(p.last_run_status),
     }
 
 
@@ -57,18 +60,26 @@ def _serialize_pipeline_detail(p):
         "organization_id": str(p.organization_id),
         "name": p.name,
         "description": p.description,
-        "config": p.config,
-        "is_enabled": p.is_enabled,
+        "status": _fmt(p.status),
+        "schedule": p.schedule,
+        "tags": p.tags,
+        "is_enabled": p.is_enabled if hasattr(p, 'is_enabled') else True,
         "created_by": str(p.created_by) if p.created_by else None,
         "created_at": _fmt(p.created_at),
         "updated_at": _fmt(p.updated_at),
+        "last_run_at": _fmt(p.last_run_at),
+        "last_run_status": _fmt(p.last_run_status),
         "nodes": [
             {
                 "id": str(n.id),
                 "pipeline_id": str(n.pipeline_id),
-                "node_type": n.node_type,
-                "config": n.config,
-                "position": n.position,
+                "node_type": _fmt(n.node_type),
+                "label": n.label,
+                "config": n.config or {},
+                "position": {
+                    "x": n.position_x,
+                    "y": n.position_y,
+                },
             }
             for n in (p.nodes or [])
         ],
@@ -76,8 +87,8 @@ def _serialize_pipeline_detail(p):
             {
                 "id": str(e.id),
                 "pipeline_id": str(e.pipeline_id),
-                "source": str(e.source),
-                "target": str(e.target),
+                "source": str(e.source_node_id),
+                "target": str(e.target_node_id),
             }
             for e in (p.edges or [])
         ],
@@ -199,8 +210,13 @@ async def run_pipeline(
             "pipeline_id": str(run.pipeline_id),
             "triggered_by": str(run.triggered_by),
             "status": _fmt(run.status),
+            "input_records": run.input_records,
+            "output_records": run.output_records,
+            "failed_records": run.failed_records,
+            "duration_seconds": run.duration_seconds,
+            "error_message": run.error_message,
             "started_at": _fmt(run.started_at),
-            "ended_at": _fmt(run.ended_at),
+            "completed_at": _fmt(run.completed_at),
             "created_at": _fmt(run.created_at),
         }
     except Exception as e:
@@ -228,8 +244,13 @@ async def get_runs(
                     "pipeline_id": str(r.pipeline_id),
                     "triggered_by": str(r.triggered_by) if r.triggered_by else None,
                     "status": _fmt(r.status),
+                    "input_records": r.input_records,
+                    "output_records": r.output_records,
+                    "failed_records": r.failed_records,
+                    "duration_seconds": r.duration_seconds,
+                    "error_message": r.error_message,
                     "started_at": _fmt(r.started_at),
-                    "ended_at": _fmt(r.ended_at),
+                    "completed_at": _fmt(r.completed_at),
                     "created_at": _fmt(r.created_at),
                 }
                 for r in runs

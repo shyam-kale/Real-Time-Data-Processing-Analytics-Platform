@@ -8,7 +8,7 @@ from app.db.base import get_db
 from app.api.deps import get_current_user, get_org_member
 from app.models.user import User
 from app.models.dataset import Dataset
-from app.models.pipeline import Pipeline, PipelineRun
+from app.models.pipeline import Pipeline, PipelineRun, PipelineStatus
 from app.models.quality import QualityReport
 from app.models.activity import ActivityLog
 
@@ -48,7 +48,7 @@ async def get_overview(
 
         active_pl = (await db.execute(
             select(func.count()).select_from(Pipeline)
-            .where(Pipeline.organization_id == org_id, Pipeline.status == "active")
+            .where(Pipeline.organization_id == org_id, Pipeline.status == PipelineStatus.ACTIVE)
         )).scalar() or 0
 
         avg_quality = (await db.execute(
