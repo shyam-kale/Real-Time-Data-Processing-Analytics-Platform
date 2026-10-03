@@ -7,24 +7,13 @@ class Base(DeclarativeBase):
     pass
 
 
-def _get_database_url() -> str:
-    """Always use SQLite. Ignore any MySQL/Postgres URL from environment."""
-    url = os.environ.get("DATABASE_URL", "")
-    # If it's a MySQL or Postgres URL, ignore it and use SQLite
-    if url.startswith("mysql") or url.startswith("postgres"):
-        return "sqlite+aiosqlite:///./dataflow.db"
-    if url.startswith("sqlite"):
-        return url
-    return "sqlite+aiosqlite:///./dataflow.db"
-
-
-DATABASE_URL = _get_database_url()
-IS_SQLITE = "sqlite" in DATABASE_URL
+# Always SQLite — ignore any injected DATABASE_URL from platform (Railway injects MySQL)
+SQLITE_URL = "sqlite+aiosqlite:///./dataflow.db"
 
 engine = create_async_engine(
-    DATABASE_URL,
+    SQLITE_URL,
     echo=False,
-    connect_args={"check_same_thread": False} if IS_SQLITE else {},
+    connect_args={"check_same_thread": False},
 )
 
 AsyncSessionLocal = async_sessionmaker(
