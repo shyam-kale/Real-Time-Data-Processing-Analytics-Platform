@@ -28,7 +28,7 @@ async def main():
             print("Seed data already exists -- skipping")
             return
 
-        owner = User(email="shyam@dataflow.io", full_name="Shyam Kumar", hashed_password=hash_password("dataflow123"))
+        owner = User(email="shyam@dataflow.io", full_name="Shyam Patil", hashed_password=hash_password("dataflow123"))
         alice = User(email="alice@dataflow.io",  full_name="Alice Chen",   hashed_password=hash_password("dataflow123"))
         bob   = User(email="bob@dataflow.io",    full_name="Bob Martinez", hashed_password=hash_password("dataflow123"))
         db.add_all([owner, alice, bob])
