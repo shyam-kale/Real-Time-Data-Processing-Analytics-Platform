@@ -20,10 +20,7 @@ async def main():
     )
 
     # Import all models so metadata is populated
-    from app.models import (  # noqa: F401
-        user, organization, dataset, pipeline,
-        quality, report, alert, api_key, activity
-    )
+    import app.models  # noqa: F401
     from app.db.base import Base
 
     # Create all tables
@@ -31,17 +28,18 @@ async def main():
         await conn.run_sync(Base.metadata.create_all)
     print("✅ Tables created")
 
-    # Seed demo user
     Session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with Session() as db:
-        from app.core.security import hash_password
-
         # Check if already seeded
         result = await db.execute(text("SELECT COUNT(*) FROM users"))
         count = result.scalar()
         if count > 0:
-            print("✅ Database already seeded, skipping")
+            print("✅ Already seeded, skipping")
+            await engine.dispose()
             return
+
+        from app.core.security import hash_password
+        pwd_hash = hash_password("dataflow123")
 
         # Create org
         await db.execute(text("""
@@ -50,20 +48,19 @@ async def main():
         """))
 
         # Create user
-        pwd_hash = hash_password("dataflow123")
         await db.execute(text("""
             INSERT INTO users (id, email, full_name, hashed_password, is_active, is_superuser, created_at, updated_at)
             VALUES ('user-1', 'shyam@dataflow.io', 'Shyam Patil', :pwd, 1, 1, datetime('now'), datetime('now'))
         """), {"pwd": pwd_hash})
 
-        # Create member
+        # Create member — uses joined_at not created_at
         await db.execute(text("""
-            INSERT INTO organization_members (id, user_id, organization_id, role, created_at)
+            INSERT INTO organization_members (id, user_id, organization_id, role, joined_at)
             VALUES ('member-1', 'user-1', 'org-1', 'owner', datetime('now'))
         """))
 
         await db.commit()
-        print("✅ Demo user created: shyam@dataflow.io / dataflow123")
+        print("✅ Demo user seeded: shyam@dataflow.io / dataflow123")
 
     await engine.dispose()
 
