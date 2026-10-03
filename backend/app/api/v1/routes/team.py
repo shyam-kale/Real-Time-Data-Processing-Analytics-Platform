@@ -1,4 +1,5 @@
-﻿from fastapi import APIRouter, Depends
+﻿from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.base import get_db
@@ -10,6 +11,16 @@ from app.services.org_service import get_org_members, invite_member, update_memb
 router = APIRouter(prefix="/orgs/{org_id}/team", tags=["team"])
 
 
+def _fmt(v):
+    if v is None:
+        return None
+    if hasattr(v, 'isoformat'):
+        return v.isoformat()
+    if hasattr(v, 'value'):
+        return v.value
+    return v
+
+
 @router.get("")
 async def list_members(
     org_id: str,
@@ -17,7 +28,24 @@ async def list_members(
     current_user: User = Depends(get_current_user),
     _member=Depends(get_org_member),
 ):
-    return await get_org_members(db, org_id)
+    try:
+        members = await get_org_members(db, org_id)
+        return {
+            "items": [
+                {
+                    "id": str(m.id),
+                    "organization_id": str(m.organization_id),
+                    "user_id": str(m.user_id),
+                    "role": m.role,
+                    "joined_at": _fmt(m.joined_at),
+                }
+                for m in members
+            ]
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": f"Error: {str(e)}"})
 
 
 @router.post("/invite", status_code=201)
@@ -28,9 +56,20 @@ async def invite(
     current_user: User = Depends(get_current_user),
     _member=Depends(get_org_member),
 ):
-    result = await invite_member(db, org_id, current_user.id, data)
-    await db.commit()
-    return result
+    try:
+        result = await invite_member(db, org_id, current_user.id, data)
+        await db.commit()
+        return {
+            "id": str(result.id),
+            "organization_id": str(result.organization_id),
+            "user_id": str(result.user_id),
+            "role": result.role,
+            "joined_at": _fmt(result.joined_at),
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": f"Error: {str(e)}"})
 
 
 @router.put("/{member_id}")
@@ -42,9 +81,20 @@ async def update_role(
     current_user: User = Depends(get_current_user),
     _member=Depends(get_org_member),
 ):
-    member = await update_member_role(db, org_id, member_id, current_user.id, data)
-    await db.commit()
-    return {"id": member.id, "role": member.role}
+    try:
+        member = await update_member_role(db, org_id, member_id, current_user.id, data)
+        await db.commit()
+        return {
+            "id": str(member.id),
+            "organization_id": str(member.organization_id),
+            "user_id": str(member.user_id),
+            "role": member.role,
+            "joined_at": _fmt(member.joined_at),
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse(status_code=500, content={"detail": f"Error: {str(e)}"})
 
 
 @router.delete("/{member_id}", status_code=204)
