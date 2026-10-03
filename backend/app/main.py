@@ -1,8 +1,10 @@
 import asyncio
+import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from app.core.config import settings
 from app.core.logging import configure_logging
@@ -16,8 +18,6 @@ configure_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create upload dir
-    import os
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 
     # Start Redis pub/sub relay (silently fails if Redis unavailable)
@@ -40,6 +40,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# CORS — allow all origins in dev, restrict in production via env var
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.allowed_origins_list,
@@ -48,45 +49,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-@app.exception_handler(Exception)
-async def unhandled_exception_handler(request: Request, exc: Exception):
-    """
-    Catch-all for unhandled exceptions. FastAPI's CORSMiddleware does not
-    add CORS headers to 500 responses, which masks the real error in the
-    browser. This handler logs the error and returns a JSON 500 with the
-    CORS origin header so the browser can read the actual error message.
-    """
-    import logging
-    import traceback
-    logger = logging.getLogger("app")
-    logger.error("Unhandled exception: %s\n%s", exc, traceback.format_exc())
-
-    origin = request.headers.get("origin", "")
-    allowed = settings.allowed_origins_list
-    headers = {}
-    if origin in allowed:
-        headers["Access-Control-Allow-Origin"] = origin
-        headers["Access-Control-Allow-Credentials"] = "true"
-
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error", "error": str(exc)},
-        headers=headers,
-    )
-
+# ── API routes ─────────────────────────────────────────────────────────────────
 API = "/api/v1"
-app.include_router(auth.router,     prefix=API)
-app.include_router(overview.router, prefix=API)
-app.include_router(datasets.router, prefix=API)
-app.include_router(pipelines.router,prefix=API)
-app.include_router(runs.router,     prefix=API)
-app.include_router(analytics.router,prefix=API)
-app.include_router(reports.router,  prefix=API)
-app.include_router(alerts.router,   prefix=API)
-app.include_router(team.router,     prefix=API)
-app.include_router(api_keys.router, prefix=API)
-app.include_router(activity.router, prefix=API)
+app.include_router(auth.router,      prefix=API)
+app.include_router(overview.router,  prefix=API)
+app.include_router(datasets.router,  prefix=API)
+app.include_router(pipelines.router, prefix=API)
+app.include_router(runs.router,      prefix=API)
+app.include_router(analytics.router, prefix=API)
+app.include_router(reports.router,   prefix=API)
+app.include_router(alerts.router,    prefix=API)
+app.include_router(team.router,      prefix=API)
+app.include_router(api_keys.router,  prefix=API)
+app.include_router(activity.router,  prefix=API)
 app.include_router(ws.router)
 
 
@@ -95,6 +70,28 @@ async def health():
     return {"status": "ok", "version": settings.VERSION}
 
 
-@app.get("/")
-async def root():
-    return {"name": settings.APP_NAME, "version": settings.VERSION, "docs": "/docs"}
+# ── Serve React frontend static files ─────────────────────────────────────────
+# Only mount if the static folder exists (production build)
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "..", "static")
+STATIC_DIR = os.path.abspath(STATIC_DIR)
+
+if os.path.isdir(STATIC_DIR):
+    # Serve assets (JS, CSS, images) from /assets
+    app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets")), name="assets")
+
+    # Serve everything else as the React SPA (catch-all)
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # Let API and docs routes through
+        if full_path.startswith("api/") or full_path.startswith("docs") or full_path.startswith("redoc"):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404)
+        index = os.path.join(STATIC_DIR, "index.html")
+        if os.path.isfile(index):
+            return FileResponse(index)
+        return {"error": "Frontend not built"}
+else:
+    # Development mode — no static files, just API
+    @app.get("/")
+    async def root():
+        return {"name": settings.APP_NAME, "version": settings.VERSION, "docs": "/docs"}
