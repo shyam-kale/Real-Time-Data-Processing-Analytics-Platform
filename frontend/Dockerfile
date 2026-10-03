@@ -2,13 +2,19 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy everything first
+# bust cache
+ARG CACHEBUST=1
+
+# Copy all frontend files into container
 COPY . .
 
-# Install deps and build
-RUN npm install && npm run build
+# Install dependencies
+RUN npm install
 
-# Install serve globally
+# Build the app
+RUN npm run build
+
+# Install serve to host the built app
 RUN npm install -g serve
 
 EXPOSE 3000
