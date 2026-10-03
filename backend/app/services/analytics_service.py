@@ -3,14 +3,14 @@ import json
 from typing import Optional
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-import pandas as pd
-import numpy as np
 
 from app.services.dataset_service import get_dataset
 from app.schemas.analytics import AnalyticsQuery, AnalyticsResult
 
 
 async def run_analytics_query(db: AsyncSession, org_id: str, query: AnalyticsQuery) -> AnalyticsResult:
+    import pandas as pd
+    import numpy as np
     dataset = await get_dataset(db, query.dataset_id, org_id)
     start_ms = time.time() * 1000
 
@@ -90,7 +90,8 @@ async def run_analytics_query(db: AsyncSession, org_id: str, query: AnalyticsQue
     )
 
 
-def _generate_demo_df(dataset) -> Optional[pd.DataFrame]:
+def _generate_demo_df(dataset) -> "Optional[pd.DataFrame]":
+    import pandas as pd
     """Generate synthetic demo data from schema_snapshot for seeded datasets."""
     import random
     from datetime import datetime, timedelta
