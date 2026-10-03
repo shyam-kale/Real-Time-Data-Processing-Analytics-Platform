@@ -2,14 +2,13 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-COPY package.json ./
-
-RUN npm install
-
+# Copy everything first
 COPY . .
 
-RUN npm run build
+# Install deps and build
+RUN npm install && npm run build
 
+# Install serve globally
 RUN npm install -g serve
 
 EXPOSE 3000
