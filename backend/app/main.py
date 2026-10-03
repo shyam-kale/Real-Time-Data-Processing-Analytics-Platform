@@ -18,17 +18,28 @@ configure_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Ensure upload directory exists
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+    
+    # Initialize database tables
+    try:
+        from app.db.base import init_db
+        asyncio.create_task(init_db())
+    except Exception as e:
+        print(f"Warning: Could not initialize DB: {e}")
 
     # Start Redis pub/sub relay (silently fails if Redis unavailable)
-    from app.websockets.manager import redis_subscriber
-    task = asyncio.create_task(redis_subscriber())
-    yield
-    task.cancel()
     try:
-        await task
-    except asyncio.CancelledError:
-        pass
+        from app.websockets.manager import redis_subscriber
+        task = asyncio.create_task(redis_subscriber())
+        yield
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+    except Exception:
+        yield
 
 
 app = FastAPI(

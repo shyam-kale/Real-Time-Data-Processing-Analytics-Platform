@@ -39,8 +39,9 @@ COPY --from=frontend-builder /frontend/dist ./backend/static
 # Set working directory to backend
 WORKDIR /app/backend
 
-# Create tables on startup (SQLite auto-creates the file)
+# Create tables and seed data on startup
 RUN python create_tables.py || echo "Tables already exist"
+RUN python seed.py || echo "Seed already exists"
 
 EXPOSE 8000
 
