@@ -6,6 +6,10 @@ from sqlalchemy.sql import func
 from app.db.base import Base
 
 
+def _enum(e):
+    return Enum(e, values_callable=lambda x: [i.value for i in x], native_enum=False)
+
+
 class QualitySeverity(str, enum.Enum):
     INFO = "info"
     WARNING = "warning"
@@ -57,8 +61,8 @@ class QualityIssue(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     report_id: Mapped[str] = mapped_column(String(36), ForeignKey("quality_reports.id", ondelete="CASCADE"), nullable=False, index=True)
-    issue_type: Mapped[QualityIssueType] = mapped_column(Enum(QualityIssueType), nullable=False)
-    severity: Mapped[QualitySeverity] = mapped_column(Enum(QualitySeverity), nullable=False)
+    issue_type: Mapped[QualityIssueType] = mapped_column(_enum(QualityIssueType), nullable=False)
+    severity: Mapped[QualitySeverity] = mapped_column(_enum(QualitySeverity), nullable=False)
     column_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     affected_rows: Mapped[int] = mapped_column(BigInteger, default=0)

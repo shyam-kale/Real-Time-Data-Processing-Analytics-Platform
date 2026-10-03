@@ -9,6 +9,11 @@ from sqlalchemy.sql import func
 from app.db.base import Base
 
 
+def _enum(e):
+    """Helper: create a non-native Enum that stores lowercase values."""
+    return Enum(e, values_callable=lambda x: [i.value for i in x], native_enum=False)
+
+
 class PipelineStatus(str, enum.Enum):
     DRAFT = "draft"
     ACTIVE = "active"
@@ -43,13 +48,13 @@ class Pipeline(Base):
     created_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    status: Mapped[PipelineStatus] = mapped_column(Enum(PipelineStatus), default=PipelineStatus.DRAFT)
-    schedule: Mapped[str | None] = mapped_column(String(100), nullable=True)  # cron expression
+    status: Mapped[PipelineStatus] = mapped_column(_enum(PipelineStatus), default=PipelineStatus.DRAFT)
+    schedule: Mapped[str | None] = mapped_column(String(100), nullable=True)
     tags: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     last_run_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    last_run_status: Mapped[RunStatus | None] = mapped_column(Enum(RunStatus), nullable=True)
+    last_run_status: Mapped[RunStatus | None] = mapped_column(_enum(RunStatus), nullable=True)
 
     organization: Mapped["Organization"] = relationship("Organization", back_populates="pipelines")
     nodes: Mapped[list["PipelineNode"]] = relationship(
@@ -68,7 +73,7 @@ class PipelineNode(Base):
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     pipeline_id: Mapped[str] = mapped_column(String(36), ForeignKey("pipelines.id", ondelete="CASCADE"), nullable=False, index=True)
-    node_type: Mapped[NodeType] = mapped_column(Enum(NodeType), nullable=False)
+    node_type: Mapped[NodeType] = mapped_column(_enum(NodeType), nullable=False)
     label: Mapped[str] = mapped_column(String(255), nullable=False)
     config: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     position_x: Mapped[float] = mapped_column(Float, default=0.0)
@@ -94,7 +99,7 @@ class PipelineRun(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     pipeline_id: Mapped[str] = mapped_column(String(36), ForeignKey("pipelines.id", ondelete="CASCADE"), nullable=False, index=True)
     triggered_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
-    status: Mapped[RunStatus] = mapped_column(Enum(RunStatus), default=RunStatus.PENDING)
+    status: Mapped[RunStatus] = mapped_column(_enum(RunStatus), default=RunStatus.PENDING)
     celery_task_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     current_stage: Mapped[str | None] = mapped_column(String(255), nullable=True)
     input_records: Mapped[int | None] = mapped_column(BigInteger, nullable=True)

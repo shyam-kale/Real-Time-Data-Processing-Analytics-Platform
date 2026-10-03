@@ -9,6 +9,10 @@ from sqlalchemy.sql import func
 from app.db.base import Base
 
 
+def _enum(e):
+    return Enum(e, values_callable=lambda x: [i.value for i in x], native_enum=False)
+
+
 class DatasetStatus(str, enum.Enum):
     PENDING = "pending"
     PROCESSING = "processing"
@@ -30,22 +34,20 @@ class Dataset(Base):
     created_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    file_format: Mapped[FileFormat] = mapped_column(Enum(FileFormat), nullable=False)
+    file_format: Mapped[FileFormat] = mapped_column(_enum(FileFormat), nullable=False)
     file_path: Mapped[str] = mapped_column(String(500), nullable=False)
     file_size_bytes: Mapped[int] = mapped_column(BigInteger, default=0)
-    status: Mapped[DatasetStatus] = mapped_column(Enum(DatasetStatus), default=DatasetStatus.PENDING)
+    status: Mapped[DatasetStatus] = mapped_column(_enum(DatasetStatus), default=DatasetStatus.PENDING)
 
-    # Profiling results
     row_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     column_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     null_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     duplicate_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
 
-    # Schema snapshot (JSON)
     schema_snapshot: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     profile_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
-    tags: Mapped[str | None] = mapped_column(String(500), nullable=True)  # comma-separated
+    tags: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     last_profiled_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -76,10 +78,9 @@ class DatasetColumn(Base):
     dataset_id: Mapped[str] = mapped_column(String(36), ForeignKey("datasets.id", ondelete="CASCADE"), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     position: Mapped[int] = mapped_column(Integer, nullable=False)
-    data_type: Mapped[ColumnDataType] = mapped_column(Enum(ColumnDataType), nullable=False)
+    data_type: Mapped[ColumnDataType] = mapped_column(_enum(ColumnDataType), nullable=False)
     nullable: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    # Statistics
     null_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     unique_count: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     min_value: Mapped[str | None] = mapped_column(String(500), nullable=True)

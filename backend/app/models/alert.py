@@ -6,6 +6,10 @@ from sqlalchemy.sql import func
 from app.db.base import Base
 
 
+def _enum(e):
+    return Enum(e, values_callable=lambda x: [i.value for i in x], native_enum=False)
+
+
 class AlertConditionType(str, enum.Enum):
     QUALITY_SCORE_BELOW = "quality_score_below"
     MISSING_VALUES_ABOVE = "missing_values_above"
@@ -37,12 +41,12 @@ class Alert(Base):
     created_by: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    condition_type: Mapped[AlertConditionType] = mapped_column(Enum(AlertConditionType), nullable=False)
+    condition_type: Mapped[AlertConditionType] = mapped_column(_enum(AlertConditionType), nullable=False)
     threshold: Mapped[float | None] = mapped_column(Float, nullable=True)
     dataset_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("datasets.id"), nullable=True)
     pipeline_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("pipelines.id"), nullable=True)
-    severity: Mapped[AlertSeverity] = mapped_column(Enum(AlertSeverity), default=AlertSeverity.MEDIUM)
-    status: Mapped[AlertStatus] = mapped_column(Enum(AlertStatus), default=AlertStatus.ACTIVE)
+    severity: Mapped[AlertSeverity] = mapped_column(_enum(AlertSeverity), default=AlertSeverity.MEDIUM)
+    status: Mapped[AlertStatus] = mapped_column(_enum(AlertStatus), default=AlertStatus.ACTIVE)
     notification_channels: Mapped[dict] = mapped_column(JSON, default=dict)
     last_triggered_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())

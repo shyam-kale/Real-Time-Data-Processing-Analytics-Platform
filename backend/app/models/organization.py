@@ -57,7 +57,11 @@ class OrganizationMember(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     organization_id: Mapped[str] = mapped_column(String(36), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    role: Mapped[OrgRole] = mapped_column(Enum(OrgRole), nullable=False, default=OrgRole.MEMBER)
+    role: Mapped[OrgRole] = mapped_column(
+        Enum(OrgRole, values_callable=lambda x: [e.value for e in x], native_enum=False),
+        nullable=False,
+        default=OrgRole.MEMBER,
+    )
     invited_by: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id"), nullable=True)
     joined_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
