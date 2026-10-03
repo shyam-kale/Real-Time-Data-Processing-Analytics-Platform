@@ -7,7 +7,7 @@ import sys
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./dataflow.db"
 os.environ["DATABASE_URL_SYNC"] = "sqlite:///./dataflow.db"
 
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
 async def main():
@@ -184,4 +184,11 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+        print("✅ Startup complete")
+    except Exception as e:
+        print(f"⚠️  Startup error (non-fatal): {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(0)  # exit 0 so the CMD semicolon still starts uvicorn
