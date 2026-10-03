@@ -132,8 +132,50 @@ async def main():
             ('act-10', 'org-1', 'user-1', 'user.registered',    'user',     'user-1','Shyam Patil',                datetime('now', '-7 days'))
         """))
 
-        await db.commit()
-        print("✅ Demo data seeded successfully:")
+        # ── Dataset Columns ───────────────────────────────────────────────────
+        await db.execute(text("""
+            INSERT INTO dataset_columns (id, dataset_id, name, position, data_type, nullable, null_count, unique_count, min_value, max_value) VALUES
+            -- ds-1: Customer Transactions
+            ('dc-1-1',  'ds-1', 'transaction_id',  0, 'string',  0,  0,    150000, NULL, NULL),
+            ('dc-1-2',  'ds-1', 'customer_id',      1, 'string',  0,  0,    42000,  NULL, NULL),
+            ('dc-1-3',  'ds-1', 'amount',           2, 'float',   0,  0,    149200, '0.5', '9999.99'),
+            ('dc-1-4',  'ds-1', 'category',         3, 'string',  1,  120,  18,     NULL, NULL),
+            ('dc-1-5',  'ds-1', 'transaction_date', 4, 'datetime',0,  0,    148000, NULL, NULL),
+            ('dc-1-6',  'ds-1', 'status',           5, 'string',  0,  0,    4,      NULL, NULL),
+            ('dc-1-7',  'ds-1', 'channel',          6, 'string',  1,  200,  3,      NULL, NULL),
+            ('dc-1-8',  'ds-1', 'region',           7, 'string',  1,  0,    12,     NULL, NULL),
+            ('dc-1-9',  'ds-1', 'currency',         8, 'string',  0,  0,    5,      NULL, NULL),
+            ('dc-1-10', 'ds-1', 'fee',              9, 'float',   1,  45000, 8000,  '0.0', '50.0'),
+            ('dc-1-11', 'ds-1', 'is_flagged',      10, 'boolean', 0,  0,    2,      NULL, NULL),
+            ('dc-1-12', 'ds-1', 'notes',           11, 'string',  1,  320,  80000,  NULL, NULL),
+            -- ds-2: Product Inventory
+            ('dc-2-1', 'ds-2', 'product_id',   0, 'string',  0, 0,  8500, NULL, NULL),
+            ('dc-2-2', 'ds-2', 'product_name', 1, 'string',  0, 0,  8490, NULL, NULL),
+            ('dc-2-3', 'ds-2', 'category',     2, 'string',  0, 0,  24,   NULL, NULL),
+            ('dc-2-4', 'ds-2', 'quantity',     3, 'integer', 0, 0,  320,  '0', '9999'),
+            ('dc-2-5', 'ds-2', 'unit_price',   4, 'float',   0, 0,  8490, '0.99', '4999.99'),
+            ('dc-2-6', 'ds-2', 'warehouse',    5, 'string',  1, 12, 8,    NULL, NULL),
+            ('dc-2-7', 'ds-2', 'last_updated', 6, 'datetime',0, 0,  8500, NULL, NULL),
+            ('dc-2-8', 'ds-2', 'sku',          7, 'string',  0, 0,  8500, NULL, NULL),
+            -- ds-3: Web Analytics Events
+            ('dc-3-1',  'ds-3', 'event_id',      0,  'string',  0,    0,     500000, NULL, NULL),
+            ('dc-3-2',  'ds-3', 'user_id',        1,  'string',  1,    1200,  95000,  NULL, NULL),
+            ('dc-3-3',  'ds-3', 'session_id',     2,  'string',  0,    0,     180000, NULL, NULL),
+            ('dc-3-4',  'ds-3', 'event_type',     3,  'string',  0,    0,     12,     NULL, NULL),
+            ('dc-3-5',  'ds-3', 'page_url',       4,  'string',  0,    0,     42000,  NULL, NULL),
+            ('dc-3-6',  'ds-3', 'duration_ms',    5,  'integer', 1,    890,   48000,  '0', '300000'),
+            ('dc-3-7',  'ds-3', 'timestamp',      6,  'datetime',0,    0,     500000, NULL, NULL),
+            ('dc-3-8',  'ds-3', 'country',        7,  'string',  1,    200,   85,     NULL, NULL),
+            ('dc-3-9',  'ds-3', 'device_type',    8,  'string',  0,    0,     4,      NULL, NULL),
+            ('dc-3-10', 'ds-3', 'browser',        9,  'string',  0,    0,     8,      NULL, NULL),
+            ('dc-3-11', 'ds-3', 'referrer',       10, 'string',  1,    280000, 18000, NULL, NULL),
+            ('dc-3-12', 'ds-3', 'is_bounce',      11, 'boolean', 0,    0,     2,      NULL, NULL),
+            ('dc-3-13', 'ds-3', 'scroll_depth',   12, 'float',   1,    400,   101,    '0.0', '1.0'),
+            ('dc-3-14', 'ds-3', 'clicks',         13, 'integer', 1,    0,     45,     '0', '200'),
+            ('dc-3-15', 'ds-3', 'conversion',     14, 'boolean', 0,    0,     2,      NULL, NULL)
+        """))
+
+
         print("   📧 Email:    shyam@dataflow.io")
         print("   🔑 Password: dataflow123")
         print("   📊 5 datasets, 5 pipelines, 10 runs, 3 reports, 4 alerts, 10 activity logs")

@@ -121,10 +121,32 @@ async def get_dataset(
     _member=Depends(get_org_member),
 ):
     try:
-        d = (await db.execute(select(Dataset).where(Dataset.id == dataset_id, Dataset.organization_id == org_id))).scalar_one_or_none()
+        from sqlalchemy.orm import selectinload
+        from app.models.dataset import DatasetColumn
+        d = (await db.execute(
+            select(Dataset)
+            .options(selectinload(Dataset.columns))
+            .where(Dataset.id == dataset_id, Dataset.organization_id == org_id)
+        )).scalar_one_or_none()
         if not d:
             raise HTTPException(404, "Dataset not found")
-        return _serialize(d)
+        result = _serialize(d)
+        result["columns"] = [
+            {
+                "id": str(c.id),
+                "name": c.name,
+                "position": c.position,
+                "data_type": _fmt(c.data_type),
+                "nullable": c.nullable,
+                "null_count": c.null_count,
+                "unique_count": c.unique_count,
+                "min_value": c.min_value,
+                "max_value": c.max_value,
+                "mean_value": c.mean_value,
+            }
+            for c in sorted(d.columns, key=lambda x: x.position)
+        ]
+        return result
     except HTTPException:
         raise
     except Exception as e:
