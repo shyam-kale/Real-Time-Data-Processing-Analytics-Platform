@@ -30,18 +30,8 @@ async def list_members(
 ):
     try:
         members = await get_org_members(db, org_id)
-        return {
-            "items": [
-                {
-                    "id": str(m.id),
-                    "organization_id": str(m.organization_id),
-                    "user_id": str(m.user_id),
-                    "role": m.role,
-                    "joined_at": _fmt(m.joined_at),
-                }
-                for m in members
-            ]
-        }
+        # get_org_members already returns List[dict] with all fields serialized
+        return {"items": members}
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -59,13 +49,8 @@ async def invite(
     try:
         result = await invite_member(db, org_id, current_user.id, data)
         await db.commit()
-        return {
-            "id": str(result.id),
-            "organization_id": str(result.organization_id),
-            "user_id": str(result.user_id),
-            "role": result.role,
-            "joined_at": _fmt(result.joined_at),
-        }
+        # invite_member already returns a dict
+        return result
     except Exception as e:
         import traceback
         traceback.print_exc()

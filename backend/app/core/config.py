@@ -17,8 +17,8 @@ class Settings(BaseSettings):
 
     SECRET_KEY: str = "dev-secret-key-change-in-production-aabbcc"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7   # 7 days for demo
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
     # Always SQLite — hardcoded, not from env
     DATABASE_URL: str = "sqlite+aiosqlite:///./dataflow.db"
