@@ -76,6 +76,7 @@ export interface DatasetColumn {
 export interface DatasetDetail extends Dataset {
   columns: DatasetColumn[]
   profile_data: Record<string, unknown> | null
+  schema_snapshot: Record<string, string> | null
 }
 
 // ─── Quality ──────────────────────────────────────────────────────────────────
