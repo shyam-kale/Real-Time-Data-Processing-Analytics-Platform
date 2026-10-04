@@ -115,9 +115,9 @@ function ConfigPanel({ node, datasets, onChange }: ConfigPanelProps) {
             {datasets.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
           </select>
         </div>
-        {cfg.file_path && (
+        {cfg.file_path ? (
           <p className="text-2xs font-mono text-muted-foreground truncate">{String(cfg.file_path)}</p>
-        )}
+        ) : null}
       </div>
     )
   }
