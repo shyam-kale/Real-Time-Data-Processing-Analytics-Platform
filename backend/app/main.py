@@ -170,6 +170,25 @@ async def health():
     return {"status": "ok", "version": settings.VERSION}
 
 
+@app.get("/api/v1/debug/counts")
+async def debug_counts(db: AsyncSession = Depends(get_db)):
+    """Debug endpoint to check if database is seeded"""
+    try:
+        user_count = (await db.execute(text("SELECT COUNT(*) FROM users"))).scalar()
+        ds_count = (await db.execute(text("SELECT COUNT(*) FROM datasets"))).scalar()
+        pl_count = (await db.execute(text("SELECT COUNT(*) FROM pipelines"))).scalar()
+        org_count = (await db.execute(text("SELECT COUNT(*) FROM organizations"))).scalar()
+        return {
+            "users": user_count,
+            "datasets": ds_count,
+            "pipelines": pl_count,
+            "organizations": org_count,
+            "db_path": settings.DATABASE_URL
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @app.get("/api/v1/init")
 async def init_endpoint(db: AsyncSession = Depends(get_db)):
     """Re-seed the database - always ensures demo data exists"""
