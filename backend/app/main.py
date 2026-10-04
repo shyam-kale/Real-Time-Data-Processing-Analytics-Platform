@@ -49,8 +49,8 @@ async def lifespan(app: FastAPI):
                     ('ds-1','org-1','user-1','Customer Transactions 2024','Monthly transaction records','csv','/data/t.csv',2048000,'ready',150000,12,320,45,'finance,customers','{"transaction_id":"string","customer_id":"string","amount":"float","category":"string","transaction_date":"datetime","status":"string","channel":"string","region":"string","currency":"string","fee":"float","is_flagged":"boolean","notes":"string"}',datetime('now','-5 days'),datetime('now','-5 days')),
                     ('ds-2','org-1','user-1','Product Inventory','Inventory snapshot','excel','/data/i.xlsx',512000,'ready',8500,8,12,3,'inventory,products','{"product_id":"string","product_name":"string","category":"string","quantity":"integer","unit_price":"float","warehouse":"string","last_updated":"datetime","sku":"string"}',datetime('now','-3 days'),datetime('now','-3 days')),
                     ('ds-3','org-1','user-1','Web Analytics Events','Clickstream events','json','/data/e.json',10240000,'ready',500000,15,1200,890,'analytics,web','{"event_id":"string","user_id":"string","session_id":"string","event_type":"string","page_url":"string","duration_ms":"integer","timestamp":"datetime","country":"string","device_type":"string","browser":"string","referrer":"string","is_bounce":"boolean","scroll_depth":"float","clicks":"integer","conversion":"boolean"}',datetime('now','-2 days'),datetime('now','-2 days')),
-                    ('ds-4','org-1','user-1','HR Employee Data','Employee records','csv','/data/hr.csv',256000,'processing',2400,20,8,0,'hr,people','{}',datetime('now','-1 days'),datetime('now','-1 days')),
-                    ('ds-5','org-1','user-1','Sales Forecast Q1','Sales forecast','csv','/data/s.csv',128000,'pending',NULL,NULL,NULL,NULL,'sales,forecast','{}',datetime('now'),datetime('now'))"""))
+                    ('ds-4','org-1','user-1','HR Employee Data','Employee records','csv','/data/hr.csv',256000,'ready',2400,20,8,0,'hr,people','{"employee_id":"string","full_name":"string","department":"string","role":"string","salary":"float","hire_date":"datetime","is_active":"boolean","performance_score":"float","location":"string","manager_id":"string","years_exp":"integer","gender":"string","education":"string","team_size":"integer","last_review":"datetime","email":"string","phone":"string","contract_type":"string","rating":"integer","notes":"string"}',datetime('now','-1 days'),datetime('now','-1 days')),
+                    ('ds-5','org-1','user-1','Sales Forecast Q1','Sales forecast','csv','/data/s.csv',128000,'ready',4200,10,5,0,'sales,forecast','{"month":"string","product":"string","region":"string","forecast_units":"integer","actual_units":"integer","forecast_revenue":"float","actual_revenue":"float","variance":"float","category":"string","rep_name":"string"}',datetime('now'),datetime('now'))"""))
                 await db.execute(text("""INSERT INTO pipelines (id,organization_id,created_by,name,description,status,schedule,tags,created_at,updated_at,last_run_at,last_run_status) VALUES
                     ('pl-1','org-1','user-1','Transaction ETL','ETL pipeline','active','0 2 * * *','etl,finance',datetime('now','-7 days'),datetime('now','-1 days'),datetime('now','-1 days'),'success'),
                     ('pl-2','org-1','user-1','Inventory Sync','Inventory sync','active','0 6 * * 1','inventory,sync',datetime('now','-5 days'),datetime('now','-2 days'),datetime('now','-2 days'),'success'),
@@ -113,7 +113,27 @@ async def lifespan(app: FastAPI):
                     ('dc-3-12','ds-3','is_bounce',11,'boolean',0,0,2,NULL,NULL),
                     ('dc-3-13','ds-3','scroll_depth',12,'float',1,400,101,'0.0','1.0'),
                     ('dc-3-14','ds-3','clicks',13,'integer',1,0,45,'0','200'),
-                    ('dc-3-15','ds-3','conversion',14,'boolean',0,0,2,NULL,NULL)"""))
+                    ('dc-3-15','ds-3','conversion',14,'boolean',0,0,2,NULL,NULL),
+                    ('dc-4-1','ds-4','employee_id',0,'string',0,0,2400,NULL,NULL),
+                    ('dc-4-2','ds-4','full_name',1,'string',0,0,2398,NULL,NULL),
+                    ('dc-4-3','ds-4','department',2,'string',0,0,12,NULL,NULL),
+                    ('dc-4-4','ds-4','role',3,'string',0,0,48,NULL,NULL),
+                    ('dc-4-5','ds-4','salary',4,'float',0,0,1200,'30000','250000'),
+                    ('dc-4-6','ds-4','hire_date',5,'datetime',0,0,2400,NULL,NULL),
+                    ('dc-4-7','ds-4','is_active',6,'boolean',0,0,2,NULL,NULL),
+                    ('dc-4-8','ds-4','performance_score',7,'float',1,8,50,'1.0','5.0'),
+                    ('dc-4-9','ds-4','location',8,'string',0,0,15,NULL,NULL),
+                    ('dc-4-10','ds-4','years_exp',9,'integer',0,0,40,'0','35'),
+                    ('dc-5-1','ds-5','month',0,'string',0,0,12,NULL,NULL),
+                    ('dc-5-2','ds-5','product',1,'string',0,0,80,NULL,NULL),
+                    ('dc-5-3','ds-5','region',2,'string',0,0,8,NULL,NULL),
+                    ('dc-5-4','ds-5','forecast_units',3,'integer',0,0,420,'100','50000'),
+                    ('dc-5-5','ds-5','actual_units',4,'integer',1,5,410,'0','48000'),
+                    ('dc-5-6','ds-5','forecast_revenue',5,'float',0,0,420,'1000.0','500000.0'),
+                    ('dc-5-7','ds-5','actual_revenue',6,'float',1,5,410,'0.0','490000.0'),
+                    ('dc-5-8','ds-5','variance',7,'float',1,5,400,NULL,NULL),
+                    ('dc-5-9','ds-5','category',8,'string',0,0,10,NULL,NULL),
+                    ('dc-5-10','ds-5','rep_name',9,'string',0,0,120,NULL,NULL)"""))
                 await db.commit()
                 print("âœ… All demo data seeded")
     except Exception as e:
@@ -220,8 +240,8 @@ async def init_endpoint(db: AsyncSession = Depends(get_db)):
         ('ds-1',:oid,:uid,'Customer Transactions 2024','Monthly customer transaction records','csv','/data/transactions.csv',2048000,'ready',150000,12,320,45,'finance,customers','{"transaction_id":"string","customer_id":"string","amount":"float","category":"string","transaction_date":"datetime","status":"string","channel":"string","region":"string","currency":"string","fee":"float","is_flagged":"boolean","notes":"string"}',datetime('now','-5 days'),datetime('now','-5 days')),
         ('ds-2',:oid,:uid,'Product Inventory','Current product inventory snapshot','excel','/data/inventory.xlsx',512000,'ready',8500,8,12,3,'inventory,products','{"product_id":"string","product_name":"string","category":"string","quantity":"integer","unit_price":"float","warehouse":"string","last_updated":"datetime","sku":"string"}',datetime('now','-3 days'),datetime('now','-3 days')),
         ('ds-3',:oid,:uid,'Web Analytics Events','User clickstream and page view events','json','/data/events.json',10240000,'ready',500000,15,1200,890,'analytics,web','{"event_id":"string","user_id":"string","session_id":"string","event_type":"string","page_url":"string","duration_ms":"integer","timestamp":"datetime","country":"string","device_type":"string","browser":"string","referrer":"string","is_bounce":"boolean","scroll_depth":"float","clicks":"integer","conversion":"boolean"}',datetime('now','-2 days'),datetime('now','-2 days')),
-        ('ds-4',:oid,:uid,'HR Employee Data','Employee records and performance metrics','csv','/data/employees.csv',256000,'processing',2400,20,8,0,'hr,people','{}',datetime('now','-1 days'),datetime('now','-1 days')),
-        ('ds-5',:oid,:uid,'Sales Forecast Q1','Quarterly sales forecast data','csv','/data/forecast.csv',128000,'pending',NULL,NULL,NULL,NULL,'sales,forecast','{}',datetime('now'),datetime('now'))"""), {"oid": org_id, "uid": user_id})
+        ('ds-4',:oid,:uid,'HR Employee Data','Employee records and performance metrics','csv','/data/employees.csv',256000,'ready',2400,20,8,0,'hr,people','{"employee_id":"string","full_name":"string","department":"string","role":"string","salary":"float","hire_date":"datetime","is_active":"boolean","performance_score":"float","location":"string","manager_id":"string","years_exp":"integer","gender":"string","education":"string","team_size":"integer","last_review":"datetime","email":"string","phone":"string","contract_type":"string","rating":"integer","notes":"string"}',datetime('now','-1 days'),datetime('now','-1 days')),
+        ('ds-5',:oid,:uid,'Sales Forecast Q1','Quarterly sales forecast data','csv','/data/forecast.csv',128000,'ready',4200,10,5,0,'sales,forecast','{"month":"string","product":"string","region":"string","forecast_units":"integer","actual_units":"integer","forecast_revenue":"float","actual_revenue":"float","variance":"float","category":"string","rep_name":"string"}',datetime('now'),datetime('now'))"""), {"oid": org_id, "uid": user_id})
 
     # Pipelines
     await db.execute(text("""INSERT INTO pipelines (id,organization_id,created_by,name,description,status,schedule,tags,created_at,updated_at,last_run_at,last_run_status) VALUES
