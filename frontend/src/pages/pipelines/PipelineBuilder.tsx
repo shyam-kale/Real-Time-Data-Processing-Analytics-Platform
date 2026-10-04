@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import React from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import ReactFlow, {
@@ -69,7 +70,7 @@ function ConfigPanel({ node, datasets, onChange }: ConfigPanelProps) {
   const cfg = (node.data.config ?? {}) as Record<string, unknown>
   const set = (key: string, value: unknown) => onChange({ ...cfg, [key]: value })
 
-  const field = (label: string, key: string, placeholder = ''): JSX.Element => (
+  const field = (label: string, key: string, placeholder = ''): React.ReactElement => (
     <div key={key}>
       <label className="block text-xs font-medium text-muted-foreground mb-1">{label}</label>
       <input
@@ -81,7 +82,7 @@ function ConfigPanel({ node, datasets, onChange }: ConfigPanelProps) {
     </div>
   )
 
-  const select = (label: string, key: string, options: string[]): JSX.Element => (
+  const select = (label: string, key: string, options: string[]): React.ReactElement => (
     <div key={key}>
       <label className="block text-xs font-medium text-muted-foreground mb-1">{label}</label>
       <select
@@ -127,7 +128,7 @@ function ConfigPanel({ node, datasets, onChange }: ConfigPanelProps) {
         <p className="text-xs text-muted-foreground">Keep rows where the column matches the condition.</p>
         {field('Column name', 'column', 'e.g. status')}
         {select('Operator', 'operator', ['eq', 'neq', 'gt', 'lt', 'contains', 'not_null'])}
-        {(cfg.operator ?? 'eq') !== 'not_null' && field('Value', 'value', 'e.g. active')}
+        {(cfg.operator ?? 'eq') !== 'not_null' ? field('Value', 'value', 'e.g. active') : null}
       </div>
     )
   }
