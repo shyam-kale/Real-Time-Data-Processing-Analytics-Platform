@@ -198,15 +198,21 @@ async def run_pipeline(
 ):
     try:
         await get_pipeline(db, pipeline_id, org_id)
-        run = PipelineRun(pipeline_id=pipeline_id, triggered_by=current_user.id, status=RunStatus.PENDING)
+        run = PipelineRun(
+            pipeline_id=pipeline_id,
+            triggered_by=current_user.id,
+            status=RunStatus.PENDING,
+        )
         db.add(run)
         await db.flush()
-        run_id = run.id
+        run_id = str(run.id)
         await db.commit()
-        from app.workers.tasks import task_execute_pipeline
-        background_tasks.add_task(lambda: task_execute_pipeline.delay(run_id))
+
+        # Execute real pipeline graph in background (no Celery needed)
+        background_tasks.add_task(_execute_pipeline_bg, run_id, pipeline_id)
+
         return {
-            "id": str(run.id),
+            "id": run_id,
             "pipeline_id": str(run.pipeline_id),
             "triggered_by": str(run.triggered_by),
             "status": _fmt(run.status),
@@ -223,6 +229,64 @@ async def run_pipeline(
         import traceback
         traceback.print_exc()
         return JSONResponse(status_code=500, content={"detail": f"Error: {str(e)}"})
+
+
+async def _execute_pipeline_bg(run_id: str, pipeline_id: str):
+    """Run the real pipeline executor in a thread pool, update DB with results."""
+    import asyncio
+    import time
+    from datetime import datetime, timezone
+    from app.db.base import AsyncSessionLocal
+    from app.models.pipeline import Pipeline, PipelineNode, PipelineEdge, PipelineRun, RunStatus
+    from app.processing.pipeline_executor import execute_pipeline_graph
+    from sqlalchemy import select
+    from sqlalchemy.orm import selectinload
+
+    async with AsyncSessionLocal() as db:
+        run = (await db.execute(select(PipelineRun).where(PipelineRun.id == run_id))).scalar_one_or_none()
+        if not run:
+            return
+
+        nodes_q = (await db.execute(select(PipelineNode).where(PipelineNode.pipeline_id == pipeline_id))).scalars().all()
+        edges_q = (await db.execute(select(PipelineEdge).where(PipelineEdge.pipeline_id == pipeline_id))).scalars().all()
+        pipeline = (await db.execute(select(Pipeline).where(Pipeline.id == pipeline_id))).scalar_one_or_none()
+
+        nodes = [{"id": n.id, "node_type": n.node_type, "label": n.label, "config": n.config} for n in nodes_q]
+        edges = [{"source_node_id": e.source_node_id, "target_node_id": e.target_node_id} for e in edges_q]
+
+        run.status     = RunStatus.RUNNING
+        run.started_at = datetime.now(timezone.utc)
+        await db.commit()
+
+        start = time.time()
+        try:
+            result = await asyncio.get_event_loop().run_in_executor(
+                None, execute_pipeline_graph, nodes, edges, None
+            )
+            duration = round(time.time() - start, 2)
+            run.status         = RunStatus.SUCCESS if result["failed_records"] == 0 else RunStatus.WARNING
+            run.input_records  = result["input_records"]
+            run.output_records = result["output_records"]
+            run.failed_records = result["failed_records"]
+            run.duration_seconds = duration
+            run.logs           = result["logs"]
+            run.metrics        = result["metrics"]
+            run.current_stage  = "complete"
+            run.completed_at   = datetime.now(timezone.utc)
+            if pipeline:
+                pipeline.last_run_at     = run.completed_at
+                pipeline.last_run_status = run.status
+        except Exception as exc:
+            import traceback; traceback.print_exc()
+            run.status        = RunStatus.FAILED
+            run.error_message = str(exc)
+            run.duration_seconds = round(time.time() - start, 2)
+            run.completed_at  = datetime.now(timezone.utc)
+            if pipeline:
+                pipeline.last_run_at     = run.completed_at
+                pipeline.last_run_status = RunStatus.FAILED
+
+        await db.commit()
 
 
 @router.get("/{pipeline_id}/runs", response_model=dict)
