@@ -22,7 +22,34 @@ configure_logging()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
-    # Redis websocket relay — silently skip if unavailable
+
+    # ── Auto-create tables and seed demo data on every startup ────────────────
+    try:
+        from app.db.base import engine, Base
+        import app.models  # noqa: ensure all models registered
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+
+        # Seed if empty
+        from sqlalchemy import text
+        from app.db.base import AsyncSessionLocal
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(text("SELECT COUNT(*) FROM users"))
+            count = result.scalar()
+            if count == 0:
+                from app.core.security import hash_password
+                pwd = hash_password("dataflow123")
+                await db.execute(text("INSERT INTO organizations (id,name,slug,description,is_active,created_at,updated_at) VALUES ('org-1','DataFlow Demo','dataflow-demo','Demo org',1,datetime('now'),datetime('now'))"))
+                await db.execute(text("INSERT INTO users (id,email,full_name,hashed_password,is_active,is_superuser,created_at,updated_at) VALUES ('user-1','shyam@dataflow.io','Shyam Patil',:pwd,1,1,datetime('now'),datetime('now'))"), {"pwd": pwd})
+                await db.execute(text("INSERT INTO organization_members (id,user_id,organization_id,role,joined_at) VALUES ('member-1','user-1','org-1','owner',datetime('now'))"))
+                await db.commit()
+                print("✅ Demo user seeded: shyam@dataflow.io / dataflow123")
+            else:
+                print(f"✅ DB ready ({count} users)")
+    except Exception as e:
+        print(f"⚠️  DB setup error: {e}")
+
+    # ── Redis websocket relay — silently skip if unavailable ──────────────────
     try:
         from app.websockets.manager import redis_subscriber
         task = asyncio.create_task(redis_subscriber())
@@ -185,6 +212,7 @@ async def init_endpoint(db: AsyncSession = Depends(get_db)):
 
 
 # ── Serve React frontend static files ─────────────────────────────────────────
+# main.py is at /app/app/main.py → ../static = /app/static
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "static")
 STATIC_DIR = os.path.normpath(STATIC_DIR)
 
