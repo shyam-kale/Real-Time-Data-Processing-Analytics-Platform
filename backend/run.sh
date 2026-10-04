@@ -1,12 +1,10 @@
 #!/bin/sh
-set -e
 
-echo "🚀 Starting DataFlow..."
+echo "Starting DataFlow..."
+echo "PORT=${PORT:-8000}"
 
-# Try to seed DB, but don't fail if it errors
-echo "📦 Initializing database..."
-python startup.py || echo "⚠️  DB init failed (non-fatal)"
+# Seed DB - failures are non-fatal
+python startup.py && echo "DB ready" || echo "DB init skipped"
 
-# Start uvicorn - this MUST succeed
-echo "🌐 Starting uvicorn on port $PORT..."
-exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+# Start server - must use PORT from Railway env var
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
