@@ -66,7 +66,8 @@ async def run_analytics_query(db: AsyncSession, org_id: str, query: AnalyticsQue
                 agg_map = {"count": "count", "sum": "sum", "avg": "mean", "min": "min", "max": "max"}
                 agg_func = agg_map.get(query.aggregation, "count")
                 if agg_func == "count":
-                    result_df = df.groupby(valid_dims).size().reset_index(name="count")
+                    # Name the column after the measure so the frontend yKey resolves correctly
+                    result_df = df.groupby(valid_dims).size().reset_index(name=valid_measures[0])
                 else:
                     result_df = df.groupby(valid_dims)[valid_measures].agg(agg_func).reset_index()
             else:
