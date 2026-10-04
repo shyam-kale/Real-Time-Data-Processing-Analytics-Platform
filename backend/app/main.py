@@ -30,22 +30,73 @@ async def lifespan(app: FastAPI):
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
 
-        # Seed if empty
-        from sqlalchemy import text
         from app.db.base import AsyncSessionLocal
         async with AsyncSessionLocal() as db:
-            result = await db.execute(text("SELECT COUNT(*) FROM users"))
-            count = result.scalar()
-            if count == 0:
+            user_count = (await db.execute(text("SELECT COUNT(*) FROM users"))).scalar()
+            ds_count = (await db.execute(text("SELECT COUNT(*) FROM datasets"))).scalar()
+
+            if user_count == 0:
                 from app.core.security import hash_password
                 pwd = hash_password("dataflow123")
                 await db.execute(text("INSERT INTO organizations (id,name,slug,description,is_active,created_at,updated_at) VALUES ('org-1','DataFlow Demo','dataflow-demo','Demo org',1,datetime('now'),datetime('now'))"))
                 await db.execute(text("INSERT INTO users (id,email,full_name,hashed_password,is_active,is_superuser,created_at,updated_at) VALUES ('user-1','shyam@dataflow.io','Shyam Patil',:pwd,1,1,datetime('now'),datetime('now'))"), {"pwd": pwd})
                 await db.execute(text("INSERT INTO organization_members (id,user_id,organization_id,role,joined_at) VALUES ('member-1','user-1','org-1','owner',datetime('now'))"))
                 await db.commit()
-                print("✅ Demo user seeded: shyam@dataflow.io / dataflow123")
-            else:
-                print(f"✅ DB ready ({count} users)")
+                print("✅ User seeded")
+
+            if ds_count == 0:
+                await db.execute(text("""INSERT INTO datasets (id,organization_id,created_by,name,description,file_format,file_path,file_size_bytes,status,row_count,column_count,null_count,duplicate_count,tags,created_at,updated_at) VALUES
+                    ('ds-1','org-1','user-1','Customer Transactions 2024','Monthly transaction records','csv','/data/t.csv',2048000,'ready',150000,12,320,45,'finance,customers',datetime('now','-5 days'),datetime('now','-5 days')),
+                    ('ds-2','org-1','user-1','Product Inventory','Inventory snapshot','excel','/data/i.xlsx',512000,'ready',8500,8,12,3,'inventory,products',datetime('now','-3 days'),datetime('now','-3 days')),
+                    ('ds-3','org-1','user-1','Web Analytics Events','Clickstream events','json','/data/e.json',10240000,'ready',500000,15,1200,890,'analytics,web',datetime('now','-2 days'),datetime('now','-2 days')),
+                    ('ds-4','org-1','user-1','HR Employee Data','Employee records','csv','/data/hr.csv',256000,'processing',2400,20,8,0,'hr,people',datetime('now','-1 days'),datetime('now','-1 days')),
+                    ('ds-5','org-1','user-1','Sales Forecast Q1','Sales forecast','csv','/data/s.csv',128000,'pending',NULL,NULL,NULL,NULL,'sales,forecast',datetime('now'),datetime('now'))"""))
+                await db.execute(text("""INSERT INTO pipelines (id,organization_id,created_by,name,description,status,schedule,tags,created_at,updated_at,last_run_at,last_run_status) VALUES
+                    ('pl-1','org-1','user-1','Transaction ETL','ETL pipeline','active','0 2 * * *','etl,finance',datetime('now','-7 days'),datetime('now','-1 days'),datetime('now','-1 days'),'success'),
+                    ('pl-2','org-1','user-1','Inventory Sync','Inventory sync','active','0 6 * * 1','inventory,sync',datetime('now','-5 days'),datetime('now','-2 days'),datetime('now','-2 days'),'success'),
+                    ('pl-3','org-1','user-1','Analytics Aggregator','Aggregation pipeline','active','0 * * * *','analytics',datetime('now','-4 days'),datetime('now'),datetime('now'),'running'),
+                    ('pl-4','org-1','user-1','Data Quality Monitor','Quality checks','draft',NULL,'quality',datetime('now','-2 days'),datetime('now','-2 days'),NULL,NULL),
+                    ('pl-5','org-1','user-1','Sales Report Generator','Report generator','archived','0 8 * * 1','sales',datetime('now','-10 days'),datetime('now','-3 days'),datetime('now','-3 days'),'failed')"""))
+                await db.execute(text("""INSERT INTO pipeline_runs (id,pipeline_id,triggered_by,status,input_records,output_records,failed_records,duration_seconds,started_at,completed_at,created_at) VALUES
+                    ('run-1','pl-1','user-1','success',150000,149655,345,42.3,datetime('now','-1 days','-5 minutes'),datetime('now','-1 days'),datetime('now','-1 days')),
+                    ('run-2','pl-1','user-1','success',148200,147900,300,38.1,datetime('now','-2 days','-5 minutes'),datetime('now','-2 days'),datetime('now','-2 days')),
+                    ('run-3','pl-1','user-1','failed',150500,0,150500,5.2,datetime('now','-3 days','-5 minutes'),datetime('now','-3 days'),datetime('now','-3 days')),
+                    ('run-4','pl-2','user-1','success',8500,8498,2,12.7,datetime('now','-2 days','-5 minutes'),datetime('now','-2 days'),datetime('now','-2 days')),
+                    ('run-5','pl-3','user-1','running',500000,NULL,NULL,NULL,datetime('now','-10 minutes'),NULL,datetime('now','-10 minutes'))"""))
+                await db.execute(text("""INSERT INTO reports (id,organization_id,created_by,name,description,config,is_public,tags,created_at,updated_at) VALUES
+                    ('rpt-1','org-1','user-1','Monthly Data Quality Summary','Quality overview','{}',1,'quality,monthly',datetime('now','-5 days'),datetime('now','-5 days')),
+                    ('rpt-2','org-1','user-1','Transaction Pipeline Health','Pipeline metrics','{}',0,'pipeline,health',datetime('now','-3 days'),datetime('now','-3 days')),
+                    ('rpt-3','org-1','user-1','Dataset Growth Trends','Growth trends','{}',1,'growth,trends',datetime('now','-1 days'),datetime('now','-1 days'))"""))
+                await db.execute(text("""INSERT INTO alerts (id,organization_id,created_by,name,description,condition_type,threshold,dataset_id,pipeline_id,severity,status,notification_channels,created_at,updated_at) VALUES
+                    ('alt-1','org-1','user-1','High Null Rate Alert','Nulls exceed 5%','missing_values_above',5.0,'ds-1',NULL,'high','active','[]',datetime('now','-5 days'),datetime('now','-5 days')),
+                    ('alt-2','org-1','user-1','Pipeline Failure Monitor','Pipeline failure','pipeline_failure',NULL,NULL,'pl-1','critical','active','[]',datetime('now','-4 days'),datetime('now','-4 days')),
+                    ('alt-3','org-1','user-1','Quality Score Drop','Score below 80','quality_score_below',80.0,'ds-3',NULL,'medium','active','[]',datetime('now','-3 days'),datetime('now','-3 days')),
+                    ('alt-4','org-1','user-1','Duplicate Rate Warning','Duplicates exceed 2%','duplicate_percentage_above',2.0,'ds-2',NULL,'low','inactive','[]',datetime('now','-2 days'),datetime('now','-2 days'))"""))
+                await db.execute(text("""INSERT INTO activity_logs (id,organization_id,user_id,action,resource_type,resource_id,resource_name,created_at) VALUES
+                    ('act-1','org-1','user-1','dataset.uploaded','dataset','ds-1','Customer Transactions 2024',datetime('now','-5 days')),
+                    ('act-2','org-1','user-1','pipeline.created','pipeline','pl-1','Transaction ETL',datetime('now','-7 days')),
+                    ('act-3','org-1','user-1','pipeline.run','pipeline','pl-1','Transaction ETL',datetime('now','-1 days')),
+                    ('act-4','org-1','user-1','dataset.uploaded','dataset','ds-2','Product Inventory',datetime('now','-3 days')),
+                    ('act-5','org-1','user-1','report.created','report','rpt-1','Monthly Data Quality Summary',datetime('now','-5 days'))"""))
+                await db.execute(text("""INSERT INTO dataset_columns (id,dataset_id,name,position,data_type,nullable,null_count,unique_count,min_value,max_value) VALUES
+                    ('dc-1-1','ds-1','transaction_id',0,'string',0,0,150000,NULL,NULL),
+                    ('dc-1-2','ds-1','customer_id',1,'string',0,0,42000,NULL,NULL),
+                    ('dc-1-3','ds-1','amount',2,'float',0,0,149200,'0.5','9999.99'),
+                    ('dc-1-4','ds-1','category',3,'string',1,120,18,NULL,NULL),
+                    ('dc-1-5','ds-1','transaction_date',4,'datetime',0,0,148000,NULL,NULL),
+                    ('dc-1-6','ds-1','status',5,'string',0,0,4,NULL,NULL),
+                    ('dc-2-1','ds-2','product_id',0,'string',0,0,8500,NULL,NULL),
+                    ('dc-2-2','ds-2','product_name',1,'string',0,0,8490,NULL,NULL),
+                    ('dc-2-3','ds-2','category',2,'string',0,0,24,NULL,NULL),
+                    ('dc-2-4','ds-2','quantity',3,'integer',0,0,320,'0','9999'),
+                    ('dc-2-5','ds-2','unit_price',4,'float',0,0,8490,'0.99','4999.99'),
+                    ('dc-3-1','ds-3','event_id',0,'string',0,0,500000,NULL,NULL),
+                    ('dc-3-2','ds-3','user_id',1,'string',1,1200,95000,NULL,NULL),
+                    ('dc-3-3','ds-3','event_type',3,'string',0,0,12,NULL,NULL),
+                    ('dc-3-4','ds-3','page_url',4,'string',0,0,42000,NULL,NULL),
+                    ('dc-3-5','ds-3','timestamp',6,'datetime',0,0,500000,NULL,NULL)"""))
+                await db.commit()
+                print("✅ All demo data seeded")
     except Exception as e:
         print(f"⚠️  DB setup error: {e}")
 
