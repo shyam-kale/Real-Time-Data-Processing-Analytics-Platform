@@ -49,8 +49,9 @@ async def create(
             "dataset_id": str(alert.dataset_id) if alert.dataset_id else None,
             "pipeline_id": str(alert.pipeline_id) if alert.pipeline_id else None,
             "severity": _fmt(alert.severity),
+            "status": _fmt(alert.status),
             "notification_channels": alert.notification_channels or [],
-            "is_active": alert.is_active,
+            "last_triggered_at": _fmt(alert.last_triggered_at),
             "created_at": _fmt(alert.created_at),
             "updated_at": _fmt(alert.updated_at),
         }
@@ -85,8 +86,9 @@ async def list_all(
                     "dataset_id": str(a.dataset_id) if a.dataset_id else None,
                     "pipeline_id": str(a.pipeline_id) if a.pipeline_id else None,
                     "severity": _fmt(a.severity),
+                    "status": _fmt(a.status),
                     "notification_channels": a.notification_channels or [],
-                    "is_active": a.is_active,
+                    "last_triggered_at": _fmt(a.last_triggered_at),
                     "created_at": _fmt(a.created_at),
                     "updated_at": _fmt(a.updated_at),
                 }
@@ -126,8 +128,9 @@ async def update(
             "dataset_id": str(a.dataset_id) if a.dataset_id else None,
             "pipeline_id": str(a.pipeline_id) if a.pipeline_id else None,
             "severity": _fmt(a.severity),
+            "status": _fmt(a.status),
             "notification_channels": a.notification_channels or [],
-            "is_active": a.is_active,
+            "last_triggered_at": _fmt(a.last_triggered_at),
             "created_at": _fmt(a.created_at),
             "updated_at": _fmt(a.updated_at),
         }
