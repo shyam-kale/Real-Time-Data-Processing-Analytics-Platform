@@ -50,5 +50,9 @@ HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
 
 EXPOSE 8000
 
-# startup.py seeds the DB; semicolon means uvicorn starts even if seeding fails
-CMD ["sh", "-c", "python startup.py; uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+EXPOSE 8000
+
+# Use shell script entrypoint for better error visibility
+COPY backend/run.sh /app/run.sh
+RUN chmod +x /app/run.sh
+CMD ["/app/run.sh"]
