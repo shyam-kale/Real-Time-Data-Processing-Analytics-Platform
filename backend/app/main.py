@@ -1,4 +1,4 @@
-import asyncio
+﻿import asyncio
 import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends
@@ -23,7 +23,7 @@ configure_logging()
 async def lifespan(app: FastAPI):
     os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 
-    # ── Auto-create tables and seed demo data on every startup ────────────────
+    # â”€â”€ Auto-create tables and seed demo data on every startup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     try:
         from app.db.base import engine, Base
         import app.models  # noqa: ensure all models registered
@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
                 await db.execute(text("INSERT INTO users (id,email,full_name,hashed_password,is_active,is_superuser,created_at,updated_at) VALUES ('user-1','shyam@dataflow.io','Shyam Patil',:pwd,1,1,datetime('now'),datetime('now'))"), {"pwd": pwd})
                 await db.execute(text("INSERT INTO organization_members (id,user_id,organization_id,role,joined_at) VALUES ('member-1','user-1','org-1','owner',datetime('now'))"))
                 await db.commit()
-                print("✅ User seeded")
+                print("âœ… User seeded")
 
             if ds_count == 0:
                 await db.execute(text("""INSERT INTO datasets (id,organization_id,created_by,name,description,file_format,file_path,file_size_bytes,status,row_count,column_count,null_count,duplicate_count,tags,created_at,updated_at) VALUES
@@ -96,11 +96,11 @@ async def lifespan(app: FastAPI):
                     ('dc-3-4','ds-3','page_url',4,'string',0,0,42000,NULL,NULL),
                     ('dc-3-5','ds-3','timestamp',6,'datetime',0,0,500000,NULL,NULL)"""))
                 await db.commit()
-                print("✅ All demo data seeded")
+                print("âœ… All demo data seeded")
     except Exception as e:
-        print(f"⚠️  DB setup error: {e}")
+        print(f"âš ï¸  DB setup error: {e}")
 
-    # ── Redis websocket relay — silently skip if unavailable ──────────────────
+    # â”€â”€ Redis websocket relay â€” silently skip if unavailable â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     try:
         from app.websockets.manager import redis_subscriber
         task = asyncio.create_task(redis_subscriber())
@@ -130,7 +130,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── API routes ─────────────────────────────────────────────────────────────────
+# â”€â”€ API routes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 API = "/api/v1"
 app.include_router(auth.router,      prefix=API)
 app.include_router(overview.router,  prefix=API)
@@ -183,7 +183,7 @@ async def init_endpoint(db: AsyncSession = Depends(get_db)):
         ('ds-2',:oid,:uid,'Product Inventory','Current product inventory snapshot','excel','/data/inventory.xlsx',512000,'ready',8500,8,12,3,'inventory,products',datetime('now','-3 days'),datetime('now','-3 days')),
         ('ds-3',:oid,:uid,'Web Analytics Events','User clickstream and page view events','json','/data/events.json',10240000,'ready',500000,15,1200,890,'analytics,web',datetime('now','-2 days'),datetime('now','-2 days')),
         ('ds-4',:oid,:uid,'HR Employee Data','Employee records and performance metrics','csv','/data/employees.csv',256000,'processing',2400,20,8,0,'hr,people',datetime('now','-1 days'),datetime('now','-1 days')),
-        ('ds-5',:oid,:uid,'Sales Forecast Q1','Quarterly sales forecast data','csv','/data/forecast.csv',128000,'pending',NULL,NULL,NULL,NULL,'sales,forecast',datetime('now'),datetime('now'))"""), {"oid": org_id, "uid": user_id}))
+        ('ds-5',:oid,:uid,'Sales Forecast Q1','Quarterly sales forecast data','csv','/data/forecast.csv',128000,'pending',NULL,NULL,NULL,NULL,'sales,forecast',datetime('now'),datetime('now'))"""), {"oid": org_id, "uid": user_id})
 
     # Pipelines
     await db.execute(text("""INSERT INTO pipelines (id,organization_id,created_by,name,description,status,schedule,tags,created_at,updated_at,last_run_at,last_run_status) VALUES
@@ -191,7 +191,7 @@ async def init_endpoint(db: AsyncSession = Depends(get_db)):
         ('pl-2',:oid,:uid,'Inventory Sync','Sync product inventory from ERP system','active','0 6 * * 1','inventory,sync',datetime('now','-5 days'),datetime('now','-2 days'),datetime('now','-2 days'),'success'),
         ('pl-3',:oid,:uid,'Analytics Aggregator','Aggregate web analytics events into summaries','active','0 * * * *','analytics,aggregation',datetime('now','-4 days'),datetime('now'),datetime('now'),'running'),
         ('pl-4',:oid,:uid,'Data Quality Monitor','Run quality checks on all active datasets','draft',NULL,'quality,monitoring',datetime('now','-2 days'),datetime('now','-2 days'),NULL,NULL),
-        ('pl-5',:oid,:uid,'Sales Report Generator','Generate weekly sales reports','archived','0 8 * * 1','sales,reports',datetime('now','-10 days'),datetime('now','-3 days'),datetime('now','-3 days'),'failed')"""), {"oid": org_id, "uid": user_id}))
+        ('pl-5',:oid,:uid,'Sales Report Generator','Generate weekly sales reports','archived','0 8 * * 1','sales,reports',datetime('now','-10 days'),datetime('now','-3 days'),datetime('now','-3 days'),'failed')"""), {"oid": org_id, "uid": user_id})
 
     # Pipeline Runs
     await db.execute(text("""INSERT INTO pipeline_runs (id,pipeline_id,triggered_by,status,input_records,output_records,failed_records,duration_seconds,started_at,completed_at,created_at) VALUES
@@ -204,20 +204,20 @@ async def init_endpoint(db: AsyncSession = Depends(get_db)):
         ('run-7','pl-5',:uid,'failed',12000,0,12000,8.9,datetime('now','-3 days','-5 minutes'),datetime('now','-3 days'),datetime('now','-3 days')),
         ('run-8','pl-2',:uid,'success',8200,8200,0,11.3,datetime('now','-9 days','-5 minutes'),datetime('now','-9 days'),datetime('now','-9 days')),
         ('run-9','pl-1',:uid,'success',147500,147200,300,39.8,datetime('now','-5 days','-5 minutes'),datetime('now','-5 days'),datetime('now','-5 days')),
-        ('run-10','pl-1',:uid,'warning',150200,149100,1100,44.2,datetime('now','-6 days','-5 minutes'),datetime('now','-6 days'),datetime('now','-6 days'))"""), {"uid": user_id}))
+        ('run-10','pl-1',:uid,'warning',150200,149100,1100,44.2,datetime('now','-6 days','-5 minutes'),datetime('now','-6 days'),datetime('now','-6 days'))"""), {"uid": user_id})
 
     # Reports
     await db.execute(text("""INSERT INTO reports (id,organization_id,created_by,name,description,config,is_public,tags,created_at,updated_at) VALUES
         ('rpt-1',:oid,:uid,'Monthly Data Quality Summary','Overview of data quality scores across all datasets','{}',1,'quality,monthly',datetime('now','-5 days'),datetime('now','-5 days')),
         ('rpt-2',:oid,:uid,'Transaction Pipeline Health','Performance metrics for transaction ETL pipeline','{}',0,'pipeline,health',datetime('now','-3 days'),datetime('now','-3 days')),
-        ('rpt-3',:oid,:uid,'Dataset Growth Trends','Track dataset size and record count growth over time','{}',1,'growth,trends',datetime('now','-1 days'),datetime('now','-1 days'))"""), {"oid": org_id, "uid": user_id}))
+        ('rpt-3',:oid,:uid,'Dataset Growth Trends','Track dataset size and record count growth over time','{}',1,'growth,trends',datetime('now','-1 days'),datetime('now','-1 days'))"""), {"oid": org_id, "uid": user_id})
 
     # Alerts
     await db.execute(text("""INSERT INTO alerts (id,organization_id,created_by,name,description,condition_type,threshold,dataset_id,pipeline_id,severity,status,notification_channels,created_at,updated_at) VALUES
         ('alt-1',:oid,:uid,'High Null Rate Alert','Trigger when null values exceed 5%','missing_values_above',5.0,'ds-1',NULL,'high','active','[]',datetime('now','-5 days'),datetime('now','-5 days')),
         ('alt-2',:oid,:uid,'Pipeline Failure Monitor','Alert on any pipeline failure','pipeline_failure',NULL,NULL,'pl-1','critical','active','[]',datetime('now','-4 days'),datetime('now','-4 days')),
         ('alt-3',:oid,:uid,'Quality Score Drop','Alert when quality score falls below 80','quality_score_below',80.0,'ds-3',NULL,'medium','active','[]',datetime('now','-3 days'),datetime('now','-3 days')),
-        ('alt-4',:oid,:uid,'Duplicate Rate Warning','Warn when duplicate rows exceed 2%','duplicate_percentage_above',2.0,'ds-2',NULL,'low','inactive','[]',datetime('now','-2 days'),datetime('now','-2 days'))"""), {"oid": org_id, "uid": user_id}))
+        ('alt-4',:oid,:uid,'Duplicate Rate Warning','Warn when duplicate rows exceed 2%','duplicate_percentage_above',2.0,'ds-2',NULL,'low','inactive','[]',datetime('now','-2 days'),datetime('now','-2 days'))"""), {"oid": org_id, "uid": user_id})
 
     # Activity logs
     await db.execute(text("""INSERT INTO activity_logs (id,organization_id,user_id,action,resource_type,resource_id,resource_name,created_at) VALUES
@@ -230,7 +230,7 @@ async def init_endpoint(db: AsyncSession = Depends(get_db)):
         ('act-7',:oid,:uid,'pipeline.failed','pipeline','pl-1','Transaction ETL',datetime('now','-3 days')),
         ('act-8',:oid,:uid,'dataset.uploaded','dataset','ds-3','Web Analytics Events',datetime('now','-2 days')),
         ('act-9',:oid,:uid,'pipeline.run','pipeline','pl-2','Inventory Sync',datetime('now','-2 days')),
-        ('act-10',:oid,:uid,'user.registered','user',:uid,'Shyam Patil',datetime('now','-7 days'))"""), {"oid": org_id, "uid": user_id}))
+        ('act-10',:oid,:uid,'user.registered','user',:uid,'Shyam Patil',datetime('now','-7 days'))"""), {"oid": org_id, "uid": user_id})
 
     # Dataset Columns
     await db.execute(text("""INSERT INTO dataset_columns (id,dataset_id,name,position,data_type,nullable,null_count,unique_count,min_value,max_value) VALUES
@@ -274,8 +274,8 @@ async def init_endpoint(db: AsyncSession = Depends(get_db)):
     return {"status": "seeded", "email": "shyam@dataflow.io", "password": "dataflow123", "datasets": 5, "pipelines": 5, "runs": 10, "reports": 3, "alerts": 4}
 
 
-# ── Serve React frontend static files ─────────────────────────────────────────
-# main.py is at /app/app/main.py → ../static = /app/static
+# â”€â”€ Serve React frontend static files â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# main.py is at /app/app/main.py â†’ ../static = /app/static
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "static")
 STATIC_DIR = os.path.normpath(STATIC_DIR)
 
@@ -299,3 +299,4 @@ else:
     @app.get("/")
     async def root():
         return {"name": settings.APP_NAME, "version": settings.VERSION, "docs": "/docs"}
+
