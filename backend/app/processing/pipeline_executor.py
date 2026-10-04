@@ -58,6 +58,38 @@ def execute_pipeline_graph(
     cfg = source.get("config", {})
     file_path = cfg.get("file_path", "")
     file_format_str = cfg.get("file_format", "csv")
+
+    # If the user picked a dataset by ID (from the Builder dropdown) but file_path
+    # wasn't saved, resolve it now from the database synchronously.
+    if not file_path and cfg.get("dataset_id"):
+        try:
+            import os as _os
+            from app.db.base import AsyncSessionLocal as _ASL
+            import asyncio as _asyncio
+            from app.models.dataset import Dataset as _Dataset
+            from sqlalchemy import select as _select
+
+            async def _resolve():
+                async with _ASL() as _db:
+                    row = (await _db.execute(_select(_Dataset).where(_Dataset.id == cfg["dataset_id"]))).scalar_one_or_none()
+                    if row:
+                        return row.file_path, str(row.file_format.value if hasattr(row.file_format, "value") else row.file_format)
+                    return "", "csv"
+
+            try:
+                loop = _asyncio.get_event_loop()
+                if loop.is_running():
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                        future = pool.submit(_asyncio.run, _resolve())
+                        file_path, file_format_str = future.result(timeout=10)
+                else:
+                    file_path, file_format_str = loop.run_until_complete(_resolve())
+            except Exception as _e:
+                _log(logs, "source", f"Could not resolve dataset_id to file_path: {_e}", "warning")
+        except Exception:
+            pass
+
     fmt_map = {"csv": FileFormat.CSV, "json": FileFormat.JSON, "excel": FileFormat.EXCEL}
     fmt = fmt_map.get(file_format_str, FileFormat.CSV)
 
@@ -114,7 +146,13 @@ def execute_pipeline_graph(
 
             elif ntype == NodeType.DEDUPLICATE:
                 before = len(df)
-                subset = cfg.get("subset")  # list of columns or None
+                subset = cfg.get("subset")
+                # Handle subset_raw (comma-separated string from the builder UI)
+                if not subset and cfg.get("subset_raw"):
+                    subset = [s.strip() for s in str(cfg["subset_raw"]).split(",") if s.strip()]
+                # Filter to only columns that actually exist
+                if subset:
+                    subset = [c for c in subset if c in df.columns] or None
                 df = df.drop_duplicates(subset=subset if subset else None)
                 dropped = before - len(df)
                 failed_records += dropped
@@ -167,13 +205,20 @@ def execute_pipeline_graph(
 
             elif ntype == NodeType.AGGREGATE:
                 group_cols = cfg.get("group_by", [])
+                # Handle group_by_raw (comma-separated string from builder UI)
+                if not group_cols and cfg.get("group_by_raw"):
+                    group_cols = [s.strip() for s in str(cfg["group_by_raw"]).split(",") if s.strip()]
                 agg_col = cfg.get("column")
                 func_name = cfg.get("function", "count")
-                if group_cols and all(c in df.columns for c in group_cols):
+                # Filter to existing columns
+                group_cols = [c for c in group_cols if c in df.columns]
+                if group_cols:
                     if func_name == "count":
                         df = df.groupby(group_cols).size().reset_index(name=agg_col or "count")
                     elif agg_col and agg_col in df.columns:
                         df = df.groupby(group_cols)[agg_col].agg(func_name).reset_index()
+                    else:
+                        df = df.groupby(group_cols).size().reset_index(name="count")
                 _log(logs, ntype, f"Aggregated to {len(df):,} rows")
 
             elif ntype == NodeType.QUALITY_CHECK:

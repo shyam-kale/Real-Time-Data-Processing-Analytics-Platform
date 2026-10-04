@@ -30,6 +30,8 @@ export default function Datasets() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['datasets', orgId, page, search],
     queryFn: () => datasetsApi.list(orgId, page, 20, search || undefined),
+    // Poll while any dataset is still processing
+    refetchInterval: (q) => q.state.data?.items.some(d => d.status === 'processing') ? 2000 : false,
   })
 
   const uploadMut = useMutation({

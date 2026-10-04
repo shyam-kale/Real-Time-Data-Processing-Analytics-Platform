@@ -9,14 +9,15 @@ import ReactFlow, {
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import { pipelinesApi } from '@/services/pipelines'
+import { datasetsApi } from '@/services/datasets'
 import { useOrg } from '@/hooks/useOrg'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { cn } from '@/utils/cn'
-import { Save, Play, ArrowLeft, Plus } from 'lucide-react'
+import { Save, ArrowLeft, Plus } from 'lucide-react'
 import type { NodeType } from '@/types'
 
-// ── Node type definitions ─────────────────────────────────────────────────────
+// ── Node type palette ─────────────────────────────────────────────────────────
 const NODE_TYPES_DEF: { type: NodeType; label: string; color: string }[] = [
   { type: 'source',        label: 'Source',        color: 'bg-blue-50 border-blue-300 dark:bg-blue-900/30 dark:border-blue-600' },
   { type: 'validation',    label: 'Validation',    color: 'bg-purple-50 border-purple-300 dark:bg-purple-900/30 dark:border-purple-600' },
@@ -42,7 +43,6 @@ function PipelineNodeComponent({ data, selected }: NodeProps) {
   )
 }
 
-// Define OUTSIDE component to prevent ReactFlow warning #002
 const NODE_COMPONENTS: Record<string, React.ComponentType<NodeProps>> = {
   pipelineNode: PipelineNodeComponent,
 }
@@ -54,9 +54,208 @@ function makeNode(type: NodeType, label: string, x: number, y: number): Node {
     id: `node_${nodeCount}_${Date.now()}`,
     type: 'pipelineNode',
     position: { x, y },
-    data: { label, nodeType: type },
+    data: { label, nodeType: type, config: {} },
   }
 }
+
+// ── Config panel per node type ─────────────────────────────────────────────────
+interface ConfigPanelProps {
+  node: Node
+  datasets: { id: string; name: string; file_path: string; file_format: string }[]
+  onChange: (config: Record<string, unknown>) => void
+}
+
+function ConfigPanel({ node, datasets, onChange }: ConfigPanelProps) {
+  const cfg = (node.data.config ?? {}) as Record<string, unknown>
+  const set = (key: string, value: unknown) => onChange({ ...cfg, [key]: value })
+
+  const field = (label: string, key: string, placeholder = '') => (
+    <div key={key}>
+      <label className="block text-xs font-medium text-muted-foreground mb-1">{label}</label>
+      <input
+        value={String(cfg[key] ?? '')}
+        onChange={e => set(key, e.target.value)}
+        placeholder={placeholder}
+        className="w-full h-8 rounded-md border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+      />
+    </div>
+  )
+
+  const select = (label: string, key: string, options: string[]) => (
+    <div key={key}>
+      <label className="block text-xs font-medium text-muted-foreground mb-1">{label}</label>
+      <select
+        value={String(cfg[key] ?? options[0])}
+        onChange={e => set(key, e.target.value)}
+        className="w-full h-8 rounded-md border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+      >
+        {options.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  )
+
+  const ntype = node.data.nodeType as NodeType
+
+  if (ntype === 'source') {
+    return (
+      <div className="space-y-3">
+        <p className="text-xs text-muted-foreground">Pick a dataset you already uploaded. The pipeline will read its actual file.</p>
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1">Dataset</label>
+          <select
+            value={String(cfg.dataset_id ?? '')}
+            onChange={e => {
+              const ds = datasets.find(d => d.id === e.target.value)
+              if (ds) onChange({ ...cfg, dataset_id: ds.id, file_path: ds.file_path, file_format: ds.file_format })
+            }}
+            className="w-full h-8 rounded-md border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+          >
+            <option value="">— select dataset —</option>
+            {datasets.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </select>
+        </div>
+        {cfg.file_path && (
+          <p className="text-2xs font-mono text-muted-foreground truncate">{String(cfg.file_path)}</p>
+        )}
+      </div>
+    )
+  }
+
+  if (ntype === 'filter') {
+    return (
+      <div className="space-y-3">
+        <p className="text-xs text-muted-foreground">Keep rows where the column matches the condition.</p>
+        {field('Column name', 'column', 'e.g. status')}
+        {select('Operator', 'operator', ['eq', 'neq', 'gt', 'lt', 'contains', 'not_null'])}
+        {(cfg.operator ?? 'eq') !== 'not_null' && field('Value', 'value', 'e.g. active')}
+      </div>
+    )
+  }
+
+  if (ntype === 'transform') {
+    // Show up to 3 transform operations
+    const transforms = (cfg.transforms as { op: string; column: string; value?: string; new_name?: string }[]) ?? []
+    const ops = ['uppercase', 'lowercase', 'strip', 'fill_null', 'to_numeric', 'to_datetime', 'rename']
+    return (
+      <div className="space-y-3">
+        <p className="text-xs text-muted-foreground">Apply operations to specific columns.</p>
+        {[0, 1, 2].map(i => {
+          const t = transforms[i] ?? { op: 'uppercase', column: '' }
+          const update = (patch: Partial<typeof t>) => {
+            const next = [...transforms]
+            next[i] = { ...t, ...patch }
+            // remove trailing empty entries
+            while (next.length > 0 && !next[next.length - 1].column) next.pop()
+            onChange({ ...cfg, transforms: next })
+          }
+          return (
+            <div key={i} className="space-y-1.5 border border-border rounded-md p-2">
+              <p className="text-2xs font-semibold text-muted-foreground uppercase">Step {i + 1}</p>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Column</label>
+                <input value={t.column} onChange={e => update({ column: e.target.value })} placeholder="column_name"
+                  className="w-full h-8 rounded-md border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Operation</label>
+                <select value={t.op} onChange={e => update({ op: e.target.value })}
+                  className="w-full h-8 rounded-md border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring">
+                  {ops.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+              {t.op === 'fill_null' && (
+                <input value={t.value ?? ''} onChange={e => update({ value: e.target.value })} placeholder="fill value"
+                  className="w-full h-8 rounded-md border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+              )}
+              {t.op === 'rename' && (
+                <input value={t.new_name ?? ''} onChange={e => update({ new_name: e.target.value })} placeholder="new column name"
+                  className="w-full h-8 rounded-md border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+              )}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  if (ntype === 'deduplicate') {
+    return (
+      <div className="space-y-3">
+        <p className="text-xs text-muted-foreground">Remove duplicate rows. Leave subset blank to deduplicate on all columns.</p>
+        {field('Subset columns (comma-separated)', 'subset_raw', 'e.g. email,name')}
+        <p className="text-2xs text-muted-foreground">Saved as array automatically on run.</p>
+      </div>
+    )
+  }
+
+  if (ntype === 'aggregate') {
+    return (
+      <div className="space-y-3">
+        <p className="text-xs text-muted-foreground">Group rows and compute a summary statistic.</p>
+        {field('Group by columns (comma-separated)', 'group_by_raw', 'e.g. category,region')}
+        {field('Aggregate column', 'column', 'e.g. amount')}
+        {select('Function', 'function', ['count', 'sum', 'avg', 'min', 'max'])}
+      </div>
+    )
+  }
+
+  if (ntype === 'validation') {
+    const rules = (cfg.rules as { column: string; check: string }[]) ?? []
+    const checks = ['not_null', 'positive', 'unique']
+    return (
+      <div className="space-y-3">
+        <p className="text-xs text-muted-foreground">Drop rows that fail a validation rule.</p>
+        {[0, 1, 2].map(i => {
+          const r = rules[i] ?? { column: '', check: 'not_null' }
+          const update = (patch: Partial<typeof r>) => {
+            const next = [...rules]
+            next[i] = { ...r, ...patch }
+            while (next.length > 0 && !next[next.length - 1].column) next.pop()
+            onChange({ ...cfg, rules: next })
+          }
+          return (
+            <div key={i} className="space-y-1.5 border border-border rounded-md p-2">
+              <p className="text-2xs font-semibold text-muted-foreground uppercase">Rule {i + 1}</p>
+              <input value={r.column} onChange={e => update({ column: e.target.value })} placeholder="column_name"
+                className="w-full h-8 rounded-md border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+              <select value={r.check} onChange={e => update({ check: e.target.value })}
+                className="w-full h-8 rounded-md border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring">
+                {checks.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  if (ntype === 'quality_check') {
+    return (
+      <div className="space-y-3">
+        <p className="text-xs text-muted-foreground">Log a warning when any column's completeness falls below the threshold.</p>
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1">Min completeness %</label>
+          <input type="number" min={0} max={100} value={String(cfg.min_completeness ?? 90)}
+            onChange={e => set('min_completeness', Number(e.target.value))}
+            className="w-full h-8 rounded-md border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring" />
+        </div>
+      </div>
+    )
+  }
+
+  if (ntype === 'output') {
+    return (
+      <div className="space-y-3">
+        <p className="text-xs text-muted-foreground">Final node. Records the output row count and marks the run complete.</p>
+        {field('Label / description', 'label', 'e.g. Final output')}
+      </div>
+    )
+  }
+
+  return <p className="text-xs text-muted-foreground">No configuration required for this node type.</p>
+}
+
+// ── Main component ─────────────────────────────────────────────────────────────
 
 export default function PipelineBuilder() {
   const orgId = useOrg()
@@ -68,7 +267,21 @@ export default function PipelineBuilder() {
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
   const [selected, setSelected] = useState<Node | null>(null)
 
-  // Load existing pipeline
+  // Fetch uploaded datasets for the source node picker
+  const { data: datasetsRes } = useQuery({
+    queryKey: ['datasets-list', orgId],
+    queryFn: () => datasetsApi.list(orgId, 1, 100),
+    enabled: !!orgId,
+  })
+  const datasets = (datasetsRes?.items ?? []).map(d => ({
+    id: d.id,
+    name: d.name,
+    // file_path is on DatasetDetail only; fall back to empty — the backend resolves from dataset_id
+    file_path: (d as any).file_path ?? '',
+    file_format: d.file_format,
+  }))
+
+  // Load existing pipeline when editing
   useQuery({
     queryKey: ['pipeline-load', orgId, id],
     queryFn: async () => {
@@ -78,8 +291,8 @@ export default function PipelineBuilder() {
       setNodes(p.nodes.map(n => ({
         id: n.id,
         type: 'pipelineNode',
-        position: { x: n.position_x, y: n.position_y },
-        data: { label: n.label, nodeType: n.node_type, config: n.config },
+        position: { x: n.position_x ?? 0, y: n.position_y ?? 0 },
+        data: { label: n.label, nodeType: n.node_type, config: n.config ?? {} },
       })))
       setEdges(p.edges.map(e => ({ id: e.id, source: e.source_node_id, target: e.target_node_id })))
       return p
@@ -89,9 +302,28 @@ export default function PipelineBuilder() {
 
   const saveMut = useMutation({
     mutationFn: () => {
+      // Normalise subset/group_by fields that users enter as comma-separated strings
+      const processedNodes = nodes.map(n => {
+        const cfg = { ...(n.data.config ?? {}) } as Record<string, unknown>
+        if (n.data.nodeType === 'deduplicate' && cfg.subset_raw) {
+          cfg.subset = String(cfg.subset_raw).split(',').map((s: string) => s.trim()).filter(Boolean)
+          delete cfg.subset_raw
+        }
+        if (n.data.nodeType === 'aggregate' && cfg.group_by_raw) {
+          cfg.group_by = String(cfg.group_by_raw).split(',').map((s: string) => s.trim()).filter(Boolean)
+          delete cfg.group_by_raw
+        }
+        return {
+          id: n.id,
+          node_type: n.data.nodeType,
+          label: n.data.label,
+          config: cfg,
+          position: n.position,
+        }
+      })
       const payload = {
         name,
-        nodes: nodes.map(n => ({ id: n.id, node_type: n.data.nodeType, label: n.data.label, config: n.data.config ?? {}, position: n.position })),
+        nodes: processedNodes,
         edges: edges.map(e => ({ id: e.id, source: e.source, target: e.target })),
       }
       return id ? pipelinesApi.update(orgId, id, payload) : pipelinesApi.create(orgId, payload)
@@ -102,10 +334,19 @@ export default function PipelineBuilder() {
   const onConnect = useCallback((conn: Connection) => setEdges(e => addEdge(conn, e)), [setEdges])
 
   const addNode = (type: NodeType, label: string) => {
-    const x = 100 + Math.random() * 300
-    const y = 100 + Math.random() * 200
+    const x = 120 + Math.random() * 280
+    const y = 80 + Math.random() * 220
     setNodes(ns => [...ns, makeNode(type, label, x, y)])
   }
+
+  const updateConfig = (nodeId: string, config: Record<string, unknown>) => {
+    setNodes(ns => ns.map(n => n.id === nodeId ? { ...n, data: { ...n.data, config } } : n))
+    // keep selected in sync
+    setSelected(prev => prev?.id === nodeId ? { ...prev, data: { ...prev.data, config } } : prev)
+  }
+
+  // Sync selected node data from live nodes list (position/config can change externally)
+  const liveSelected = selected ? nodes.find(n => n.id === selected.id) ?? selected : null
 
   return (
     <div className="flex flex-col h-[calc(100vh-48px)]">
@@ -118,6 +359,7 @@ export default function PipelineBuilder() {
           className="flex-1 max-w-xs bg-transparent text-sm font-semibold text-foreground border-0 focus:outline-none focus:ring-0 placeholder:text-muted-foreground"
           placeholder="Pipeline name..."
         />
+        <span className="text-xs text-muted-foreground">{nodes.length} nodes · {edges.length} edges</span>
         <div className="ml-auto flex items-center gap-2">
           <Button variant="outline" size="sm" icon={<Save className="w-3.5 h-3.5" />} loading={saveMut.isPending} onClick={() => saveMut.mutate()}>
             Save
@@ -128,7 +370,7 @@ export default function PipelineBuilder() {
       <div className="flex flex-1 min-h-0">
         {/* Left panel — node palette */}
         <div className="w-48 border-r border-border bg-card overflow-y-auto p-3 space-y-1 flex-shrink-0">
-          <p className="text-2xs font-semibold text-muted-foreground uppercase tracking-wider px-1 mb-2">Node types</p>
+          <p className="text-2xs font-semibold text-muted-foreground uppercase tracking-wider px-1 mb-2">Add node</p>
           {NODE_TYPES_DEF.map(n => (
             <button
               key={n.type}
@@ -139,6 +381,9 @@ export default function PipelineBuilder() {
               {n.label}
             </button>
           ))}
+          <div className="pt-3 border-t border-border mt-2">
+            <p className="text-2xs text-muted-foreground px-1">Drag nodes on the canvas, connect them left→right, then Save.</p>
+          </div>
         </div>
 
         {/* Canvas */}
@@ -161,43 +406,41 @@ export default function PipelineBuilder() {
         </div>
 
         {/* Right panel — node config */}
-        {selected && (
-          <div className="w-64 border-l border-border bg-card p-4 overflow-y-auto flex-shrink-0">
-            <p className="text-xs font-semibold text-foreground mb-3">Configure node</p>
-            <div className="space-y-3">
-              <Input
-                label="Label"
-                value={selected.data.label}
-                onChange={e => setNodes(ns => ns.map(n => n.id === selected.id ? { ...n, data: { ...n.data, label: e.target.value } } : n))}
-              />
-              <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1.5">Type</label>
-                <select
-                  value={selected.data.nodeType}
-                  onChange={e => setNodes(ns => ns.map(n => n.id === selected.id ? { ...n, data: { ...n.data, nodeType: e.target.value } } : n))}
-                  className="w-full h-9 rounded-md border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  {NODE_TYPES_DEF.map(t => <option key={t.type} value={t.type}>{t.label}</option>)}
-                </select>
-              </div>
-              {selected.data.nodeType === 'source' && (
-                <Input
-                  label="File path"
-                  value={(selected.data.config as any)?.file_path ?? ''}
-                  onChange={e => setNodes(ns => ns.map(n => n.id === selected.id ? { ...n, data: { ...n.data, config: { ...(n.data.config ?? {}), file_path: e.target.value } } } : n))}
-                  placeholder="/uploads/file.csv"
+        {liveSelected && (
+          <div className="w-72 border-l border-border bg-card p-4 overflow-y-auto flex-shrink-0 space-y-4">
+            <div>
+              <p className="text-xs font-semibold text-foreground mb-3">Configure node</p>
+              {/* Label */}
+              <div className="mb-3">
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Label</label>
+                <input
+                  value={liveSelected.data.label}
+                  onChange={e => setNodes(ns => ns.map(n => n.id === liveSelected.id ? { ...n, data: { ...n.data, label: e.target.value } } : n))}
+                  className="w-full h-8 rounded-md border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                 />
-              )}
-              {selected.data.nodeType === 'filter' && (
-                <>
-                  <Input label="Column" value={(selected.data.config as any)?.column ?? ''} onChange={e => setNodes(ns => ns.map(n => n.id === selected.id ? { ...n, data: { ...n.data, config: { ...(n.data.config ?? {}), column: e.target.value } } } : n))} placeholder="column_name" />
-                  <Input label="Value" value={(selected.data.config as any)?.value ?? ''} onChange={e => setNodes(ns => ns.map(n => n.id === selected.id ? { ...n, data: { ...n.data, config: { ...(n.data.config ?? {}), value: e.target.value } } } : n))} />
-                </>
-              )}
-              <Button variant="destructive" size="xs" className="w-full" onClick={() => { setNodes(ns => ns.filter(n => n.id !== selected.id)); setSelected(null) }}>
-                Remove node
-              </Button>
+              </div>
+
+              {/* Type badge */}
+              <div className="mb-4">
+                <span className={cn('inline-block px-2 py-0.5 rounded border text-xs font-medium capitalize', colorMap[liveSelected.data.nodeType] ?? '')}>
+                  {String(liveSelected.data.nodeType).replace('_', ' ')}
+                </span>
+              </div>
+
+              {/* Dynamic config fields */}
+              <ConfigPanel
+                node={liveSelected}
+                datasets={datasets}
+                onChange={(config) => updateConfig(liveSelected.id, config)}
+              />
             </div>
+
+            <button
+              onClick={() => { setNodes(ns => ns.filter(n => n.id !== liveSelected.id)); setSelected(null) }}
+              className="w-full mt-2 px-3 py-1.5 rounded-md border border-destructive text-destructive text-xs font-medium hover:bg-destructive/10 transition-colors"
+            >
+              Remove node
+            </button>
           </div>
         )}
       </div>

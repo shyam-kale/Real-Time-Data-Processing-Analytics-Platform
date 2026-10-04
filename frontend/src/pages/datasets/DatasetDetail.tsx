@@ -21,6 +21,8 @@ export default function DatasetDetail() {
   const { data: ds, isLoading, error, refetch } = useQuery({
     queryKey: ['dataset', orgId, id],
     queryFn: () => datasetsApi.get(orgId, id!),
+    // Poll while processing so the schema updates automatically after profiling
+    refetchInterval: (q) => q.state.data?.status === 'processing' ? 2000 : false,
   })
 
   const { data: reports } = useQuery({
