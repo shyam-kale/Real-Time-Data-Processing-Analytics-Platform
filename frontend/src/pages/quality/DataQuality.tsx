@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { datasetsApi } from '@/services/datasets'
 import { useOrg } from '@/hooks/useOrg'
@@ -11,12 +11,12 @@ import { InlineLoader } from '@/components/ui/Spinner'
 import { EmptyState, ErrorState } from '@/components/ui/EmptyState'
 import { formatRelative, formatNumber, scoreColor, scoreBg } from '@/utils/format'
 import { ShieldCheck, RefreshCw } from 'lucide-react'
+import type { QualityReport, QualityIssue } from '@/types'
 
 export default function DataQuality() {
   const orgId = useOrg()
   const qc = useQueryClient()
   const [selectedDataset, setSelectedDataset] = useState('')
-  // useState (not useRef) so changing it causes refetchInterval to update
   const [analysing, setAnalysing] = useState(false)
 
   const { data: datasets } = useQuery({
@@ -24,28 +24,27 @@ export default function DataQuality() {
     queryFn: () => datasetsApi.list(orgId, 1, 100),
   })
 
-  const { data: reports, isLoading, error, refetch } = useQuery({
+  const { data: reports, isLoading, error, refetch } = useQuery<QualityReport[]>({
     queryKey: ['quality-reports', orgId, selectedDataset],
     queryFn: () => datasetsApi.getQualityReports(orgId, selectedDataset),
     enabled: !!selectedDataset,
-    // Poll every 2 s while waiting for the background analysis to finish
     refetchInterval: analysing ? 2000 : false,
-    onSuccess: (data: any[]) => {
-      // Stop polling once we have at least one report
-      if (data && data.length > 0) setAnalysing(false)
-    },
   })
+
+  // Stop polling once a report arrives — replaces removed onSuccess callback
+  useEffect(() => {
+    if (reports && reports.length > 0) setAnalysing(false)
+  }, [reports])
 
   const runMut = useMutation({
     mutationFn: () => datasetsApi.triggerQuality(orgId, selectedDataset),
     onSuccess: () => {
       setAnalysing(true)
-      // Immediately clear stale cache so we show the spinner, not old data
       qc.removeQueries({ queryKey: ['quality-reports', orgId, selectedDataset] })
     },
   })
 
-  const latest = reports?.[0]
+  const latest: QualityReport | undefined = reports?.[0]
   const waiting = analysing || runMut.isPending
 
   return (
@@ -80,7 +79,6 @@ export default function DataQuality() {
           </select>
         </div>
 
-        {/* States */}
         {!selectedDataset ? (
           <Card>
             <EmptyState
@@ -119,7 +117,6 @@ export default function DataQuality() {
 
         ) : (
           <>
-            {/* Score overview */}
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
               <StatCard label="Overall"      value={`${latest.overall_score.toFixed(1)}%`}      className={scoreBg(latest.overall_score)} />
               <StatCard label="Completeness" value={`${latest.completeness_score.toFixed(1)}%`} />
@@ -128,14 +125,12 @@ export default function DataQuality() {
               <StatCard label="Consistency"  value={`${latest.consistency_score.toFixed(1)}%`}  />
             </div>
 
-            {/* Row counts */}
             <div className="grid grid-cols-3 gap-4">
               <StatCard label="Total rows"  value={formatNumber(latest.total_rows)}  />
               <StatCard label="Passed rows" value={formatNumber(latest.passed_rows)} />
               <StatCard label="Failed rows" value={formatNumber(latest.failed_rows)} />
             </div>
 
-            {/* Issues table */}
             <Card>
               <CardHeader>
                 <CardTitle>Issues ({latest.issues.length})</CardTitle>
@@ -151,7 +146,7 @@ export default function DataQuality() {
                     <Th>Type</Th><Th>Severity</Th><Th>Column</Th><Th>Description</Th><Th>Affected rows</Th><Th>%</Th>
                   </Thead>
                   <Tbody>
-                    {latest.issues.map(issue => (
+                    {latest.issues.map((issue: QualityIssue) => (
                       <Tr key={issue.id}>
                         <Td><Badge variant="outline">{issue.issue_type.replace(/_/g, ' ')}</Badge></Td>
                         <Td><SeverityBadge severity={issue.severity} /></Td>
@@ -171,14 +166,13 @@ export default function DataQuality() {
               )}
             </Card>
 
-            {/* Report history */}
             {reports && reports.length > 1 && (
               <Card>
                 <CardHeader><CardTitle>Report history</CardTitle></CardHeader>
                 <Table>
                   <Thead><Th>Date</Th><Th>Score</Th><Th>Issues</Th><Th>Rows</Th></Thead>
                   <Tbody>
-                    {reports.map(r => (
+                    {reports.map((r: QualityReport) => (
                       <Tr key={r.id}>
                         <TdMuted>{formatRelative(r.created_at)}</TdMuted>
                         <Td className={`font-semibold tabular ${scoreColor(r.overall_score)}`}>

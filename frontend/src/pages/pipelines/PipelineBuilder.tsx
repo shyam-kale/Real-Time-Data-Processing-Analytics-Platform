@@ -69,7 +69,7 @@ function ConfigPanel({ node, datasets, onChange }: ConfigPanelProps) {
   const cfg = (node.data.config ?? {}) as Record<string, unknown>
   const set = (key: string, value: unknown) => onChange({ ...cfg, [key]: value })
 
-  const field = (label: string, key: string, placeholder = '') => (
+  const field = (label: string, key: string, placeholder = ''): JSX.Element => (
     <div key={key}>
       <label className="block text-xs font-medium text-muted-foreground mb-1">{label}</label>
       <input
@@ -81,7 +81,7 @@ function ConfigPanel({ node, datasets, onChange }: ConfigPanelProps) {
     </div>
   )
 
-  const select = (label: string, key: string, options: string[]) => (
+  const select = (label: string, key: string, options: string[]): JSX.Element => (
     <div key={key}>
       <label className="block text-xs font-medium text-muted-foreground mb-1">{label}</label>
       <select
