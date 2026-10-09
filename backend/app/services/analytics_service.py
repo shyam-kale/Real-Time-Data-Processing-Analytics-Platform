@@ -1,4 +1,5 @@
 import time
+import time
 import json
 from typing import Optional
 from fastapi import HTTPException
@@ -96,10 +97,16 @@ def _generate_demo_df(dataset) -> "Optional[pd.DataFrame]":
     import pandas as pd
     import random
     from datetime import datetime, timedelta
+    import hashlib
 
     schema = dataset.schema_snapshot or {}
     if not schema:
         return None
+
+    # Use dataset ID to seed random — ensures same dataset always has same data
+    # but different datasets have different data
+    seed = int(hashlib.md5(dataset.id.encode()).hexdigest(), 16) % (2**32)
+    random.seed(seed)
 
     rows = min(dataset.row_count or 1000, 5000)
     data = {}
