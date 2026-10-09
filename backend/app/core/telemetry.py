@@ -3,6 +3,11 @@ OpenTelemetry setup → Grafana Cloud OTLP export.
 Called once at startup. Silently skipped if OTEL_ENABLED != 'true' or packages missing.
 """
 import os
+import logging
+
+# Enable debug logging if requested
+if os.getenv("OTEL_LOG_LEVEL", "").lower() == "debug":
+    logging.basicConfig(level=logging.DEBUG)
 
 
 def setup_telemetry(app=None) -> None:
@@ -33,11 +38,19 @@ def setup_telemetry(app=None) -> None:
         resource = Resource(attributes={SERVICE_NAME: service_name})
         provider = TracerProvider(resource=resource)
 
+        # Use BatchSpanProcessor with explicit flush interval (5 seconds)
         exporter = OTLPSpanExporter(
             endpoint=f"{endpoint}/v1/traces",
             headers=headers,
+            timeout=10,  # 10 second timeout for sending
         )
-        provider.add_span_processor(BatchSpanProcessor(exporter))
+        span_processor = BatchSpanProcessor(
+            exporter,
+            schedule_delay_millis=5000,  # Flush every 5 seconds
+            max_queue_size=2048,
+            max_export_batch_size=512,
+        )
+        provider.add_span_processor(span_processor)
         trace.set_tracer_provider(provider)
 
         # Instrument FastAPI routes (adds span per request)
@@ -48,7 +61,10 @@ def setup_telemetry(app=None) -> None:
         HTTPXClientInstrumentor().instrument()
         SQLAlchemyInstrumentor().instrument()
 
-        print(f"✅ OpenTelemetry enabled → Grafana (service={service_name}, endpoint={endpoint})")
+        print(f"✅ OpenTelemetry → Grafana Cloud")
+        print(f"   Service: {service_name}")
+        print(f"   Endpoint: {endpoint}/v1/traces")
+        print(f"   Flush interval: 5s")
 
     except ImportError as e:
         print(f"⚠️  OpenTelemetry packages missing, skipping tracing: {e}")
