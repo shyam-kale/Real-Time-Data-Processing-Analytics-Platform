@@ -103,6 +103,7 @@ export default function Alerts() {
       <Modal open={open} onClose={() => setOpen(false)} title="New alert" description="Define a condition to monitor">
         <div className="space-y-4">
           <Input label="Alert name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Low quality score" />
+          <Textarea label="Description" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Optional description" rows={2} />
           <div>
             <label className="block text-xs font-medium text-muted-foreground mb-1.5">Condition</label>
             <select className="w-full h-9 rounded-md border border-border bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
