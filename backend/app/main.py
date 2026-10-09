@@ -10,6 +10,7 @@ from sqlalchemy import text
 
 from app.core.config import settings
 from app.core.logging import configure_logging
+from app.core.telemetry import setup_telemetry
 from app.db.base import get_db
 from app.api.v1.routes import (
     auth, datasets, pipelines, runs, analytics,
@@ -160,6 +161,9 @@ app = FastAPI(
     redoc_url="/redoc",
     lifespan=lifespan,
 )
+
+# Wire up OpenTelemetry → Grafana Cloud OTLP
+setup_telemetry(app)
 
 app.add_middleware(
     CORSMiddleware,
