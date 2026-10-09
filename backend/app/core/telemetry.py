@@ -5,12 +5,16 @@ Called once at startup. Silently skipped if OTEL_ENABLED != 'true' or packages m
 import os
 import logging
 
-# Enable debug logging if requested
 if os.getenv("OTEL_LOG_LEVEL", "").lower() == "debug":
     logging.basicConfig(level=logging.DEBUG)
 
+# Module-level provider reference so lifespan can call force_flush + shutdown
+_provider = None
+
 
 def setup_telemetry(app=None) -> None:
+    global _provider
+
     if os.getenv("OTEL_ENABLED", "false").lower() != "true":
         return
 
@@ -28,7 +32,8 @@ def setup_telemetry(app=None) -> None:
         endpoint     = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "").rstrip("/")
         headers_raw  = os.getenv("OTEL_EXPORTER_OTLP_HEADERS", "")
 
-        # Parse "Key=Value" (single pair — Grafana uses one header)
+        # Parse "Authorization=Basic <token>" correctly
+        # The value may contain "=" characters (base64), so split on first "=" only
         headers: dict[str, str] = {}
         for part in headers_raw.split(","):
             if "=" in part:
@@ -38,35 +43,51 @@ def setup_telemetry(app=None) -> None:
         resource = Resource(attributes={SERVICE_NAME: service_name})
         provider = TracerProvider(resource=resource)
 
-        # Use BatchSpanProcessor with explicit flush interval (5 seconds)
         exporter = OTLPSpanExporter(
             endpoint=f"{endpoint}/v1/traces",
             headers=headers,
-            timeout=10,  # 10 second timeout for sending
+            timeout=10,
         )
-        span_processor = BatchSpanProcessor(
+        processor = BatchSpanProcessor(
             exporter,
-            schedule_delay_millis=5000,  # Flush every 5 seconds
+            schedule_delay_millis=5000,   # flush every 5s
             max_queue_size=2048,
             max_export_batch_size=512,
         )
-        provider.add_span_processor(span_processor)
+        provider.add_span_processor(processor)
         trace.set_tracer_provider(provider)
+        _provider = provider
 
-        # Instrument FastAPI routes (adds span per request)
+        # Send a startup span immediately so Grafana receives data right away
+        tracer = trace.get_tracer("dataflow.startup")
+        with tracer.start_as_current_span("app.startup"):
+            pass
+        provider.force_flush()  # flush the startup span before uvicorn is ready
+
+        # Auto-instrument FastAPI, SQLAlchemy, httpx
         if app is not None:
             FastAPIInstrumentor.instrument_app(app)
-
-        # Instrument outgoing HTTP calls and DB queries
         HTTPXClientInstrumentor().instrument()
         SQLAlchemyInstrumentor().instrument()
 
         print(f"✅ OpenTelemetry → Grafana Cloud")
-        print(f"   Service: {service_name}")
+        print(f"   Service : {service_name}")
         print(f"   Endpoint: {endpoint}/v1/traces")
-        print(f"   Flush interval: 5s")
 
     except ImportError as e:
-        print(f"⚠️  OpenTelemetry packages missing, skipping tracing: {e}")
+        print(f"⚠️  OpenTelemetry packages missing, skipping: {e}")
     except Exception as e:
-        print(f"⚠️  OpenTelemetry setup error, skipping tracing: {e}")
+        print(f"⚠️  OpenTelemetry setup error, skipping: {e}")
+
+
+def shutdown_telemetry() -> None:
+    """Call at app shutdown to flush remaining spans before process exits."""
+    global _provider
+    if _provider is None:
+        return
+    try:
+        _provider.force_flush()
+        _provider.shutdown()
+        print("✅ OpenTelemetry flushed and shut down")
+    except Exception as e:
+        print(f"⚠️  OpenTelemetry shutdown error: {e}")
