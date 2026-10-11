@@ -1,0 +1,28 @@
+# ─── Global vars for all webservers ───────────────────────────────────────────
+
+app_name: dataflow
+app_dir: /opt/dataflow
+repo_url: https://github.com/shyam-kale/Real-Time-Data-Processing-Analytics-Platform.git
+repo_branch: main
+
+app_port: 8000
+domain: your-domain.com   # change to your domain or Railway URL
+
+# Python
+python_version: "3.11"
+venv_dir: "{{ app_dir }}/backend/.venv"
+
+# App env
+secret_key: "change-this-in-production"
+database_url: "sqlite+aiosqlite:///{{ app_dir }}/backend/dataflow.db"
+
+# OpenTelemetry / Grafana
+otel_enabled: "true"
+otel_service_name: "dataflow"
+otel_endpoint: "https://otlp-gateway-prod-ap-south-1.grafana.net/otlp"
+otel_protocol: "http/protobuf"
+otel_headers: "Authorization=Basic MTU5NTMwMzpnbGNfZXlKdklqb2lNVGN6TWpJME1TSXNJbTRpT2lKeVpXRnNMWFJwYldVdGNISnZZMlZ6YzJsdVp5SXNJbXNpT2lJeVNubFdOR1JxYkRONFR6aFVSMEk0TjFVMU5WRXlPSE1pTENKdElqcDdJbklpT2lKd2NtOWtMV0Z3TFhOdmRYUm9MVEVpZlgwPQ=="
+
+# Backup
+backup_dir: /var/backups/dataflow
+backup_retention_days: 7

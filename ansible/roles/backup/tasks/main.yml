@@ -1,0 +1,37 @@
+# ─── Role: backup ─────────────────────────────────────────────────────────────
+# Daily SQLite DB + uploads backup with retention
+
+- name: Create backup directory
+  file:
+    path: "{{ backup_dir }}"
+    state: directory
+    owner: "{{ ansible_user }}"
+    mode: "0750"
+
+- name: Write backup script
+  copy:
+    dest: /usr/local/bin/dataflow-backup.sh
+    mode: "0755"
+    content: |
+      #!/bin/bash
+      set -e
+      DATE=$(date +%Y%m%d_%H%M%S)
+      BACKUP="{{ backup_dir }}/dataflow_$DATE.tar.gz"
+
+      echo "[$DATE] Starting backup..."
+      tar -czf "$BACKUP" \
+        -C {{ app_dir }}/backend dataflow.db \
+        -C {{ app_dir }} uploads 2>/dev/null || true
+
+      # Remove backups older than {{ backup_retention_days }} days
+      find {{ backup_dir }} -name "*.tar.gz" -mtime +{{ backup_retention_days }} -delete
+
+      echo "[$DATE] Backup saved: $BACKUP"
+
+- name: Schedule daily backup via cron (2am)
+  cron:
+    name: "DataFlow daily backup"
+    minute: "0"
+    hour: "2"
+    job: "/usr/local/bin/dataflow-backup.sh >> /var/log/dataflow-backup.log 2>&1"
+    user: "{{ ansible_user }}"

@@ -1,0 +1,45 @@
+# ─── Role: nginx ──────────────────────────────────────────────────────────────
+# Installs Nginx as reverse proxy + SSL via Certbot
+
+- name: Install Nginx and Certbot
+  apt:
+    name:
+      - nginx
+      - certbot
+      - python3-certbot-nginx
+    state: present
+    update_cache: yes
+
+- name: Write Nginx site config
+  template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/sites-available/dataflow
+    owner: root
+    mode: "0644"
+  notify: Reload nginx
+
+- name: Enable site
+  file:
+    src: /etc/nginx/sites-available/dataflow
+    dest: /etc/nginx/sites-enabled/dataflow
+    state: link
+  notify: Reload nginx
+
+- name: Remove default site
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  notify: Reload nginx
+
+- name: Start and enable Nginx
+  systemd:
+    name: nginx
+    enabled: yes
+    state: started
+
+- name: Obtain SSL certificate (skip if already exists)
+  command: >
+    certbot --nginx -d {{ domain }} --non-interactive --agree-tos
+    -m admin@{{ domain }} --redirect
+  args:
+    creates: /etc/letsencrypt/live/{{ domain }}/fullchain.pem

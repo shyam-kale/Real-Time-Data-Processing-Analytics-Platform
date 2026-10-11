@@ -1,0 +1,41 @@
+# ─── Rollback to previous git commit ──────────────────────────────────────────
+# Usage: ansible-playbook -i inventory.ini rollback.yml
+
+- name: Rollback DataFlow to previous commit
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: Get current commit
+      command: git rev-parse HEAD
+      args:
+        chdir: "{{ app_dir }}"
+      register: current_commit
+
+    - name: Show current commit
+      debug:
+        msg: "Current commit: {{ current_commit.stdout }}"
+
+    - name: Roll back one commit
+      command: git reset --hard HEAD~1
+      args:
+        chdir: "{{ app_dir }}"
+
+    - name: Rebuild frontend
+      command: npm run build
+      args:
+        chdir: "{{ app_dir }}/frontend"
+
+    - name: Restart service
+      systemd:
+        name: dataflow
+        state: restarted
+
+    - name: Confirm rollback
+      command: git rev-parse HEAD
+      args:
+        chdir: "{{ app_dir }}"
+      register: new_commit
+
+    - name: Show rolled-back commit
+      debug:
+        msg: "Rolled back to: {{ new_commit.stdout }}"

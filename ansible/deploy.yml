@@ -1,0 +1,50 @@
+# ─── Deploy only (pull latest code + restart) ─────────────────────────────────
+# Usage: ansible-playbook -i inventory.ini deploy.yml
+
+- name: Deploy latest DataFlow code
+  hosts: webservers
+  become: yes
+  tasks:
+    - name: Pull latest code from GitHub
+      git:
+        repo: "{{ repo_url }}"
+        dest: "{{ app_dir }}"
+        version: "{{ repo_branch }}"
+        force: yes
+
+    - name: Install/update Python dependencies
+      pip:
+        requirements: "{{ app_dir }}/backend/requirements.txt"
+        virtualenv: "{{ venv_dir }}"
+
+    - name: Install frontend dependencies
+      npm:
+        path: "{{ app_dir }}/frontend"
+
+    - name: Build frontend
+      command: npm run build
+      args:
+        chdir: "{{ app_dir }}/frontend"
+      environment:
+        VITE_API_BASE_URL: "https://{{ domain }}"
+
+    - name: Sync static build
+      synchronize:
+        src: "{{ app_dir }}/frontend/dist/"
+        dest: "{{ app_dir }}/static/"
+        delete: yes
+      delegate_to: "{{ inventory_hostname }}"
+
+    - name: Restart DataFlow service
+      systemd:
+        name: dataflow
+        state: restarted
+
+    - name: Verify service is running
+      systemd:
+        name: dataflow
+      register: service_status
+
+    - name: Show service status
+      debug:
+        msg: "DataFlow is {{ service_status.status.ActiveState }}"

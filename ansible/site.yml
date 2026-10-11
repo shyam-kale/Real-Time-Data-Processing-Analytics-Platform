@@ -1,0 +1,11 @@
+# ─── Master playbook — runs everything ────────────────────────────────────────
+# Usage: ansible-playbook -i inventory.ini site.yml
+
+- name: Full DataFlow deployment
+  hosts: webservers
+  become: yes
+  roles:
+    - app
+    - nginx
+    - monitoring
+    - backup
