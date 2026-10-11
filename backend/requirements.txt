@@ -19,7 +19,7 @@ pydantic==2.7.1
 pydantic-settings==2.2.1
 email-validator==2.1.1
 
-# ─── Data Processing (used by analytics_service) ──────────────────────────────
+# ─── Data Processing ──────────────────────────────────────────────────────────
 pandas==2.2.2
 numpy==1.26.4
 
@@ -29,14 +29,7 @@ httpx==0.27.0
 orjson==3.10.3
 structlog==24.1.0
 
-# ─── OpenTelemetry (Grafana Cloud OTLP) ───────────────────────────────────────
-opentelemetry-sdk==1.24.0
-opentelemetry-api==1.24.0
-opentelemetry-exporter-otlp-proto-http==1.24.0
-opentelemetry-instrumentation-fastapi==0.45b0
-opentelemetry-instrumentation-sqlalchemy==0.45b0
-opentelemetry-instrumentation-httpx==0.45b0
-# ─── OpenTelemetry (Grafana / OTLP) ──────────────────────────────────────────
+# ─── OpenTelemetry → Grafana Cloud OTLP ──────────────────────────────────────
 opentelemetry-sdk==1.24.0
 opentelemetry-api==1.24.0
 opentelemetry-exporter-otlp-proto-http==1.24.0
